@@ -26,6 +26,14 @@ class NoteService {
       return foundNote
    }
 
+   async deleteOneNote(id) {
+      await this.getOneNote(id)
+         .then((result) => {
+            Note.destroy({ where: { id } })
+            return result;
+         })
+   }
 }
+
 
 module.exports = new NoteService();

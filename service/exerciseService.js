@@ -1,3 +1,4 @@
+const { deleteOneExercise } = require('../controllers/exerciseController');
 const ApiError = require('../error/ApiError');
 const { Exercise } = require('../models/models')
 
@@ -26,6 +27,13 @@ class ExerciseService {
       return foundExercise
    }
 
+   async deleteOneExercise(id) {
+      await this.getOneExercise(id)
+         .then((result) => {
+            Exercise.destroy({ where: { id } })
+            return result
+         })
+   }
 }
 
 module.exports = new ExerciseService();

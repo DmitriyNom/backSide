@@ -33,6 +33,12 @@ class NoteController {
       return res.json(note)
    }
 
+   async deleteOneNote(req, res) {
+      const { id } = req.params;
+      const note = await NoteService.deleteOneNote(id);
+      return res.json(note);
+   }
+
 }
 
 module.exports = new NoteController();

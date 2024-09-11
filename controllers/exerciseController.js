@@ -31,6 +31,11 @@ class ExerciseController {
       return res.json(exercise)
    }
 
+   async deleteOneExercise(req, res) {
+      const { id } = req.params
+      const exercise = await ExerciseService.deleteOneExercise(id)
+      return res.json(exercise)
+   }
 }
 
 module.exports = new ExerciseController();

@@ -18,18 +18,31 @@ const Exercise = sequelize.define('exercise', {
 
 const Note = sequelize.define("note", {
    id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
-   notes_name: { type: DataTypes.STRING, unique: true, allowNull: false },
-   notes_description: { type: DataTypes.STRING, defaultValue: "A note without description" },
-   notes_priority: { type: DataTypes.INTEGER, defaultValue: 1 }
+   note_title: { type: DataTypes.STRING, unique: true, allowNull: true },
+   note_description: { type: DataTypes.STRING, defaultValue: "A note without description" },
+   note_priority: { type: DataTypes.INTEGER, defaultValue: 1 },
+   note_expiration_date: { type: DataTypes.DATE, defaultValue: null },
+   note_is_completed: { type: DataTypes.BOOLEAN, defaultValue: false }
+})
+
+const NoteGroup = sequelize.define("noteGroup", {
+   id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+   group_title: { type: DataTypes.STRING, unique: true, allowNull: true },
+   group_description: { type: DataTypes.STRING, defaultValue: "A group without description" },
+   group_priority: { type: DataTypes.INTEGER, defaultValue: 1 },
 })
 
 
 
-const UserExercise = sequelize.define("userExersice", {
+const UserExercise = sequelize.define("userExercise", {
    id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
 })
 
 const UserNote = sequelize.define("userNote", {
+   id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true }
+})
+
+const GroupOfNotes = sequelize.define("groupOfNotes", {
    id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true }
 })
 
@@ -39,6 +52,8 @@ Exercise.belongsToMany(User, { through: UserExercise })
 User.belongsToMany(Note, { through: UserNote })
 Note.belongsToMany(User, { through: UserNote })
 
+Note.belongsTo(NoteGroup, { through: GroupOfNotes })
+NoteGroup.belongsTo(Note, { through: GroupOfNotes })
 
 
 module.exports = {
@@ -46,5 +61,7 @@ module.exports = {
    Exercise,
    UserExercise,
    Note,
-   UserNote
+   UserNote,
+   NoteGroup,
+   GroupOfNotes
 }

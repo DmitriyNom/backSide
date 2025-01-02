@@ -3,9 +3,11 @@ const router = Router();
 const noteController = require('../controllers/noteController');
 const roleMiddleware = require('../middleware/CheckRoleMiddleware')
 
-router.post('/', roleMiddleware('User'), noteController.createNote);
+// router.post('/', roleMiddleware('User'), noteController.createNote);
+router.post("/", noteController.createNote)
 router.get('/', noteController.getAllNotes);
 router.get('/:id', noteController.getOneNote);
+router.put('/:id', noteController.updateNote)
 router.delete("/:id", noteController.deleteOneNote)
 
 module.exports = router;

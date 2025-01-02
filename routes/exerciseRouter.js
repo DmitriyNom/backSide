@@ -9,5 +9,6 @@ router.post('/', exerciseController.createExercise);
 router.delete('/:id', exerciseController.deleteOneExercise)
 router.get('/', exerciseController.getAllExercises);
 router.get('/:id', exerciseController.getOneExercise);
+router.put('/:id', exerciseController.updateOneExercise)
 
 module.exports = router;

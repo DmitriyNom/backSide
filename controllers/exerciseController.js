@@ -31,6 +31,18 @@ class ExerciseController {
       return res.json(exercise)
    }
 
+   async updateOneExercise(req, res) {
+      const exercise = req.body;
+      const { id } = req.params
+
+      const updatedExercise = await ExerciseService.updateOneExercise(exercise, id)
+
+      console.log("updatedExercise:" + updatedExercise)
+
+      return res.json(updatedExercise)
+   }
+
+
    async deleteOneExercise(req, res) {
       const { id } = req.params
       const exercise = await ExerciseService.deleteOneExercise(id)

@@ -33,6 +33,18 @@ class NoteController {
       return res.json(note)
    }
 
+   async updateNote(req, res) {
+      const note = req.body
+      const { id } = req.params
+
+
+      const updatedNote = await NoteService.updateOneNote(note, id)
+
+      console.log("updatedNote:" + updatedNote)
+
+      return res.json(updatedNote)
+   }
+
    async deleteOneNote(req, res) {
       const { id } = req.params;
       const note = await NoteService.deleteOneNote(id);

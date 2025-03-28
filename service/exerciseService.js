@@ -18,6 +18,8 @@ class ExerciseService {
       return allExercises
    }
 
+
+
    async getOneExercise(id) {
       const foundExercise = await Exercise.findOne(
          {
@@ -27,11 +29,38 @@ class ExerciseService {
       return foundExercise
    }
 
+
+
+   async updateOneExercise(exercise, id) {
+
+      const [updatedRowsCount, updatedRows] = await Exercise.update(
+         { ...exercise },
+         {
+            where: { id },
+            returning: true
+         }
+      )
+
+      return updatedRows[0].dataValues
+
+   }
+
    async deleteOneExercise(id) {
+
       await this.getOneExercise(id)
-         .then((result) => {
-            Exercise.destroy({ where: { id } })
-            return result
+         .then(value => {
+            if (value) {
+               return value.destroy();
+
+            } else {
+               throw new Error('Record not found')
+            }
+         })
+         .then(() => {
+            console.log("Record deleted successfully")
+         })
+         .catch(err => {
+            console.log('Error deleting record: ', err)
          })
    }
 }

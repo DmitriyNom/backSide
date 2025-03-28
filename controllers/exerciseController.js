@@ -6,8 +6,8 @@ const countOffset = require('../utils/countOffset')
 class ExerciseController {
 
    async createExercise(req, res) {
-      const { name, description } = req.body
-      const exercise = await ExerciseService.createExercise({ exercise_name: name, exercise_description: description })
+      const { exercise_name, exercise_description, exercise_mark } = req.body
+      const exercise = await ExerciseService.createExercise({ exercise_name, exercise_description, exercise_mark })
       return res.json(exercise)
    }
 
@@ -30,6 +30,18 @@ class ExerciseController {
       const exercise = await ExerciseService.getOneExercise(id)
       return res.json(exercise)
    }
+
+   async updateOneExercise(req, res) {
+      const exercise = req.body;
+      const { id } = req.params
+
+      const updatedExercise = await ExerciseService.updateOneExercise(exercise, id)
+
+      console.log("updatedExercise:" + updatedExercise)
+
+      return res.json(updatedExercise)
+   }
+
 
    async deleteOneExercise(req, res) {
       const { id } = req.params

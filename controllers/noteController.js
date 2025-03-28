@@ -8,8 +8,8 @@ const countOffset = require('../utils/countOffset')
 class NoteController {
 
    async createNote(req, res) {
-      const { name, description, priority } = req.body
-      const note = await NoteService.createNote({ notes_name: name, notes_description: description, notes_priority: priority })
+      const { note_name, note_description, note_priority, note_mark } = req.body
+      const note = await NoteService.createNote({ note_name, note_description, note_priority, note_mark })
       return res.json(note)
    }
 
@@ -31,6 +31,18 @@ class NoteController {
       const { id } = req.params
       const note = await NoteService.getOneNote(id)
       return res.json(note)
+   }
+
+   async updateOneNote(req, res) {
+      const note = req.body
+      const { id } = req.params
+
+
+      const updatedNote = await NoteService.updateOneNote(note, id)
+
+      console.log("updatedNote:" + updatedNote)
+
+      return res.json(updatedNote)
    }
 
    async deleteOneNote(req, res) {

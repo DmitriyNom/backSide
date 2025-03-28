@@ -26,6 +26,18 @@ class NoteService {
       return foundNote
    }
 
+   async updateOneNote(note, id) {
+      const [updatedRowsCount, updatedRows] = await Note.update(
+         { ...note },
+         {
+            where: { id },
+            returning: true
+         }
+      )
+
+      return updatedRows[0].dataValues
+   }
+
    async deleteOneNote(id) {
       await this.getOneNote(id)
          .then((result) => {
@@ -33,6 +45,7 @@ class NoteService {
             return result;
          })
    }
+
 }
 
 

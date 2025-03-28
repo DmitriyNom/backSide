@@ -69,6 +69,14 @@ class UserController {
       return res.json(users)
    }
 
+   /*
+
+   getUser
+   updateUser
+   deleteUser
+
+   */
+
 }
 
 module.exports = new UserController()

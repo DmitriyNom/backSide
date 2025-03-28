@@ -11,6 +11,11 @@ class UserExerciseService {
       return allExercisesForUser;
    }
 
+   async createUserExercise(userId, exerciseId) {
+      //добавить проверку на наличие юзера и упражнения с этим ид
+      return await UserExercise.create(userId, exerciseId)
+   }
+
 }
 
 

@@ -21,6 +21,14 @@ class UserExerciseController {
       return res.json(userExercises)
    }
 
+   async addOneExerciseForUser(req, res) {
+
+      const { userId, exerciseId } = req.body
+      const userExercise = await UserExerciseService.createUserExercise({ userId, exerciseId })
+      return res.json(userExercise)
+
+   }
+
 }
 
 module.exports = new UserExerciseController();

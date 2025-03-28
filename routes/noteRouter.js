@@ -7,7 +7,7 @@ const roleMiddleware = require('../middleware/CheckRoleMiddleware')
 router.post("/", noteController.createNote)
 router.get('/', noteController.getAllNotes);
 router.get('/:id', noteController.getOneNote);
-router.put('/:id', noteController.updateNote)
+router.put('/:id', noteController.updateOneNote)
 router.delete("/:id", noteController.deleteOneNote)
 
 module.exports = router;

@@ -23,7 +23,7 @@ const Exercise = sequelize.define('exercise', {
    id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
    exercise_name: { type: DataTypes.STRING, unique: true },
    exercise_description: { type: DataTypes.STRING, defaultValue: "Exercise description" },
-   exercise_mark: { type: DataTypes.STRING, allowNull: false },
+   // exercise_mark: { type: DataTypes.STRING, allowNull: false },
    exercise_media: { type: DataTypes.STRING } //Добавить обязательное заполнение
 })
 

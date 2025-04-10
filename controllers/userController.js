@@ -3,6 +3,8 @@ const bcrypt = require('bcrypt');
 const { User } = require('../models/models');
 const UserService = require('../service/userService')
 const generateJwt = require('../utils/generateJwt')
+const uuid = require('uuid')
+// const path = require('path')
 
 
 // const generateJwt = (id, email, role) => {
@@ -68,6 +70,53 @@ class UserController {
       const users = await UserService.getAllUsers();
       return res.json(users)
    }
+
+   // async updateUser(req, res, next) {
+   //    try {
+   //       const user = req.body
+   //       const { userAvatar } = req.files
+   //       const { id } = req.params
+
+   //       let filename = uuid.v4() + '.jpg'
+
+   //       if (userAvatar) {
+   //          userAvatar.mv(path.resolve(__dirname, '..', 'static', filename))
+
+   //          user.userAvatar = filename;
+   //       }
+
+   //       const updatedUser = await UserService.updateUser(user, id)
+
+   //       return res.json(updatedUser)
+   //    } catch (e) {
+   //       next(ApiError.badRequest(e.message))
+   //    }
+   // }
+
+   async updateUser(req, res, next) {
+      try {
+         const user = req.body;
+         const { id } = req.params;
+
+         if (req.file) {
+            user.userAvatar = req.file.filename;
+         } else {
+            return next(ApiError.badRequest('Файл не найден.'));
+         }
+
+         const updatedUser = await UserService.updateUser(user, id);
+         return res.json(updatedUser);
+      } catch (e) {
+         next(ApiError.badRequest(e.message));
+      }
+   }
+
+   async deleteUser(req, res) {
+      const { id } = req.params;
+      const deletedUser = await UserService.deleteUser(id);
+      return res.json(deletedUser);
+   }
+
 
    /*
 

@@ -50,7 +50,7 @@ class NoteMarkController {
 
    async deleteOneMarkForNote(req, res) {
       const { id } = req.params;
-      await NoteMarkService.deleteMark(id);
+      await NoteMarkService.deleteOneMark(id);
       return res.json("The mark has been deleted");
    }
 

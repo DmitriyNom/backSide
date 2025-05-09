@@ -1,6 +1,6 @@
 const Router = require('express');
 const router = Router();
-const userController = require('../controllers/userController')
+const userController = require('../controllers/userController');
 const authMiddleware = require('../middleware/AuthMiddleware')
 const upload = require('../middleware/FileMiddleware')
 
@@ -24,5 +24,6 @@ router.put('/:id', upload.single('userAvatar'), userController.updateUser)
 
 //DELETE
 router.delete('/:id', userController.deleteUser)
+
 
 module.exports = router;

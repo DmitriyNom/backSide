@@ -1,9 +1,42 @@
-const ApiError = require('../error/ApiError')
+// const ApiError = require('../error/ApiError')
+
+// module.exports = function (err, req, res, next) {
+//    if (err instanceof ApiError) {
+//       return res.status(err.status).json({ message: err.message })
+//    }
+
+//    return res.status(500).json({ messsage: "Непредвиденная ошибка" });
+// }
+
+// const ApiError = require('../error/ApiError');
+
+// module.exports = function (err, req, res, next) {
+//    if (err instanceof ApiError) {
+//       return res.status(err.status).json({ message: err.message });
+//    }
+
+//    return res.status(500).json({ message: "Непредвиденная ошибка" });
+// }
+
+const ApiError = require('../error/ApiError');
 
 module.exports = function (err, req, res, next) {
+   // Логируем ошибку для отладки
+   console.error(err);
+
+   // Проверяем, является ли ошибка экземпляром ApiError
    if (err instanceof ApiError) {
-      return res.status(err.status).json({ message: err.message })
+      return res.status(err.status).json({
+         status: 'error',
+         statusCode: err.status,
+         message: err.message,
+      });
    }
 
-   return res.status(500).json({ messsage: "Непредвиденная ошибка" });
+   // Обработка непредвиденных ошибок
+   return res.status(500).json({
+      status: 'error',
+      statusCode: 500,
+      message: "Непредвиденная ошибка",
+   });
 }

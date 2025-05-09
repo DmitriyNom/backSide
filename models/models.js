@@ -16,7 +16,7 @@ const User = sequelize.define('user', {
    country: { type: DataTypes.STRING },
    city: { type: DataTypes.STRING },
    teamName: { type: DataTypes.STRING },
-   userAvatar: { type: DataTypes.STRING, validate: { isUrl: true } }
+   userAvatar: { type: DataTypes.STRING, validate: { isUrl: true }, allowNull: true }
 })
 
 const Exercise = sequelize.define('exercise', {

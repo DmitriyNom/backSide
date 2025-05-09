@@ -38,12 +38,28 @@ class NoteService {
       return updatedRows[0].dataValues
    }
 
+   // async deleteOneNote(id) {
+   //    await this.getOneNote(id)
+   //       .then((result) => {
+   //          Note.destroy({ where: { id } })
+   //          return result;
+   //       })
+   // }
+
    async deleteOneNote(id) {
-      await this.getOneNote(id)
-         .then((result) => {
-            Note.destroy({ where: { id } })
-            return result;
-         })
+      try {
+         const note = await this.getOneNote(id);
+
+         if (!note) {
+            throw new Error('Record not found');
+         }
+
+         await note.destroy();
+         console.log("Record deleted successfully");
+      } catch (err) {
+         console.error('Error deleting record: ', err);
+         throw err; // Пробрасываем ошибку дальше
+      }
    }
 
 }

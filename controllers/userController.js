@@ -100,9 +100,10 @@ class UserController {
 
          if (req.file) {
             user.userAvatar = req.file.filename;
-         } else {
-            return next(ApiError.badRequest('Файл не найден.'));
          }
+         // } else {
+         //    return next(ApiError.badRequest('Файл не найден.'));
+         // }
 
          const updatedUser = await UserService.updateUser(user, id);
          return res.json(updatedUser);

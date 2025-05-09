@@ -54,7 +54,7 @@ class ExerciseMarkService {
             console.log("Record deleted successfully")
          })
          .catch(err => {
-            console.log('Error deleting record: ', err)
+            throw (err)
          })
    }
 

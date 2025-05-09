@@ -8,7 +8,8 @@ const userExerciseRouter = require('./userExerciseRouter')
 // const noteGroupsRouter = require('./noteGroupsRouter')
 // const groupOfNotesRouter = require('./groupOfNotesRouter')
 const noteMarkRouter = require('./noteMarkRouter')
-const exerciseMarkRouter = require('./exerciseMarkRouter')
+const exerciseMarkRouter = require('./exerciseMarkRouter');
+const ApiError = require('../error/ApiError');
 
 
 router.use('/user', userRouter)
@@ -19,6 +20,11 @@ router.use('/userNote', userNoteRouter)
 router.use('/userExercise', userExerciseRouter)
 router.use('/noteMark', noteMarkRouter)
 router.use('/exerciseMark', exerciseMarkRouter)
+
+router.use((req, res, next) => {
+   return next(ApiError.notFound("Ресурс не найден"))
+});
+
 
 
 module.exports = router;

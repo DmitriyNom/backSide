@@ -41,28 +41,31 @@ class ExerciseService {
          }
       )
 
-      return updatedRows[0].dataValues
+      // return updatedRows[0].dataValues
 
+      if (updatedRowsCount === 0) {
+         throw new Error('Exercise not found or not updated'); // Вы можете выбросить ошибку, если ничего не обновлено
+      }
+
+      return updatedRows[0]; // Возвращаем сам объект, а не его dataValues
    }
 
    async deleteOneExercise(id) {
+      try {
+         const exercise = await this.getOneExercise(id);
 
-      await this.getOneExercise(id)
-         .then(value => {
-            if (value) {
-               return value.destroy();
+         if (!exercise) {
+            throw new Error('Record not found');
+         }
 
-            } else {
-               throw new Error('Record not found')
-            }
-         })
-         .then(() => {
-            console.log("Record deleted successfully")
-         })
-         .catch(err => {
-            console.log('Error deleting record: ', err)
-         })
+         await exercise.destroy();
+         console.log("Record deleted successfully");
+      } catch (err) {
+         console.error('Error deleting record: ', err);
+         throw err; // Пробрасываем ошибку дальше
+      }
    }
+
 }
 
 module.exports = new ExerciseService();

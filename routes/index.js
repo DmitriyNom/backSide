@@ -1,30 +1,38 @@
 const Router = require('express');
 const router = Router();
-const userRouter = require('./userRouter')
-const exerciseRouter = require('./exerciseRouter')
-const noteRouter = require('./noteRouter')
-const userNoteRouter = require('./userNoteRouter')
-const userExerciseRouter = require('./userExerciseRouter')
-// const noteGroupsRouter = require('./noteGroupsRouter')
-// const groupOfNotesRouter = require('./groupOfNotesRouter')
-const noteMarkRouter = require('./noteMarkRouter')
-const exerciseMarkRouter = require('./exerciseMarkRouter');
 const ApiError = require('../error/ApiError');
 
+// Загрузка маршрутизаторов
+const routes = [
+   { path: '/user', router: require('./userRouter') },
+   { path: '/exercise', router: require('./exerciseRouter') },
+   { path: '/notes', router: require('./noteRouter') },
+   { path: '/noteGroup', router: require('./noteGroupRouter') },
+   { path: '/exerciseGroup', router: require('./exerciseGroupRouter') },
 
-router.use('/user', userRouter)
-router.use('/exercise', exerciseRouter)
-router.use('/note', noteRouter)
+   // { path: '/userNote', router: require('./userNoteRouter') },
+   // { path: '/userExercise', router: require('./userExerciseRouter') },
+   // { path: '/noteMark', router: require('./noteMarkRouter') },
+   // { path: '/exerciseMark', router: require('./exerciseMarkRouter') },
+   // { path: '/diaryEntries', router: require('./diaryEntriesRouter') },
+   // { path: '/sleep', router: require('./sleepRouter') },
+   // { path: '/sleep', router: require('./sleepRouter') },
+   // { path: '/nutrition', router: require('./nutritionRouter') },
+   // { path: '/workout', router: require('./workoutRouter') },
+   // { path: '/workoutExercise', router: require('./workoutExerciseRouter') },
+   // { path: '/mood', router: require('./moodRouter') },
+   // { path: '/hydration', router: require('./hydrationRouter') },
 
-router.use('/userNote', userNoteRouter)
-router.use('/userExercise', userExerciseRouter)
-router.use('/noteMark', noteMarkRouter)
-router.use('/exerciseMark', exerciseMarkRouter)
+];
 
-router.use((req, res, next) => {
-   return next(ApiError.notFound("Ресурс не найден"))
+// Маршрутизаторы
+routes.forEach(route => {
+   router.use(route.path, route.router);
 });
 
-
+// Обработка несуществующих маршрутов
+router.use((req, res, next) => {
+   return next(ApiError.notFound("Ресурс не найден"));
+});
 
 module.exports = router;

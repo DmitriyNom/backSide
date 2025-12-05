@@ -1,71 +1,44 @@
-const { deleteOneExercise } = require('../controllers/exerciseController');
 const ApiError = require('../error/ApiError');
-const { Exercise } = require('../models/models')
-
+const ExerciseRepository = require('../repository/exerciseRepository');
 
 class ExerciseService {
-
    async createExercise(exercise) {
-      const createdExercise = await Exercise.create(exercise)
-      return createdExercise
+      // exercise уже содержит userId (user_id)
+      return await ExerciseRepository.createExercise(exercise);
    }
 
-
-   async getAllExercises(limit, offset) {
-
-      const allExercises = await Exercise.findAndCountAll({ limit, offset })
-
-      return allExercises
+   async getAllExercises(userId, limit, offset) {
+      // фильтрация по userId
+      return await ExerciseRepository.getAllExercises(userId, limit, offset);
    }
 
-
-
-   async getOneExercise(id) {
-      const foundExercise = await Exercise.findOne(
-         {
-            where: { id }
-         },
-      )
-      return foundExercise
+   async getOneExercise(id, userId) {
+      return await ExerciseRepository.getOneExercise(id, userId);
    }
 
+   async updateOneExercise(exercise, id, userId) {
+      // сначала проверим, что упражнение принадлежит пользователю
+      const existingExercise = await this.getOneExercise(id, userId);
+      if (!existingExercise) {
+         throw ApiError.badRequest('Упражнение не найдено или нет доступа');
+      }
 
-
-   async updateOneExercise(exercise, id) {
-
-      const [updatedRowsCount, updatedRows] = await Exercise.update(
-         { ...exercise },
-         {
-            where: { id },
-            returning: true
-         }
-      )
-
-      // return updatedRows[0].dataValues
-
+      const [updatedRowsCount, updatedRows] = await ExerciseRepository.updateOneExercise(exercise, id, userId);
       if (updatedRowsCount === 0) {
-         throw new Error('Exercise not found or not updated'); // Вы можете выбросить ошибку, если ничего не обновлено
+         throw ApiError.badRequest('Упражнение не найдено для обновления');
       }
-
-      return updatedRows[0]; // Возвращаем сам объект, а не его dataValues
+      return updatedRows[0]; // возвращаем обновлённый объект
    }
 
-   async deleteOneExercise(id) {
-      try {
-         const exercise = await this.getOneExercise(id);
-
-         if (!exercise) {
-            throw new Error('Record not found');
-         }
-
-         await exercise.destroy();
-         console.log("Record deleted successfully");
-      } catch (err) {
-         console.error('Error deleting record: ', err);
-         throw err; // Пробрасываем ошибку дальше
+   async deleteOneExercise(id, userId) {
+      const exercise = await this.getOneExercise(id, userId);
+      if (!exercise) {
+         throw ApiError.badRequest('Упражнение не найдено или нет доступа');
       }
+      const deletedExercise = await ExerciseRepository.deleteOneExercise(id, userId);
+      console.log('Запись удалена');
+      return deletedExercise;
    }
-
 }
 
 module.exports = new ExerciseService();

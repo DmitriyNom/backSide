@@ -1,97 +1,228 @@
-const ApiError = require('../error/ApiError')
+const ApiError = require('../error/ApiError');
 const bcrypt = require('bcrypt');
-const { User } = require('../models/models');
-const UserService = require('../service/userService')
-const generateJwt = require('../utils/generateJwt')
-const uuid = require('uuid')
-// const path = require('path')
-
-
-// const generateJwt = (id, email, role) => {
-//    return jwt.sign(
-//       { id, email, role },
-//       process.env.SECRET_KEY,
-//       { expiresIn: '24h' }
-//    )
-// }
+const UserService = require('../service/userService');
+const RefreshTokenService = require('../service/refreshTokenService');
+const sequelize = require('../db');
+const jwt = require('jsonwebtoken');
+const { generateAccessToken, generateRefreshToken, verifyAccessToken } = require('../utils/generateJwt');
 
 class UserController {
+   async getUsers(req, res) {
+      const users = await UserService.getAllUsers();
+      return res.json(users);
+   }
+
+   async getProfile(req, res, next) {
+      const accessToken = req.cookies.accessToken;
+
+      if (!accessToken) {
+         return next(ApiError.unauthorized('Требуется токен доступа'));
+      }
+
+      try {
+         const userData = verifyAccessToken(accessToken);
+         const user = await UserService.findUserById(userData.id);
+
+         if (!user) {
+            return next(ApiError.notFound('Пользователь не найден'));
+         }
+
+         return res.json({
+            id: user.id,
+            email: user.email,
+            role: user.role,
+            userName: user.userName,
+            training_level: user.training_level,
+            sport_specialization: user.sport_specialization,
+            birthDate: user.birthDate,
+            userAvatar: user.userAvatar,
+            allow_connections: user.allow_connections
+         });
+      } catch (error) {
+         return next(error);
+      }
+   }
 
    async registration(req, res, next) {
-
-      const { email, password, role, userName } = req.body
-
+      const { email, password, role, userName } = req.body;
       if (!email || !password) {
-         return next(ApiError.badRequest('Некорректный email или password'))
+         return next(ApiError.badRequest('Некорректный email или password'));
       }
 
-      const candidate = await UserService.findUser(email)
+      try {
+         const result = await sequelize.transaction(async (t) => {
+            const candidate = await UserService.findUser(email);
+            if (candidate) {
+               throw ApiError.badRequest('Пользователь с таким email уже существует');
+            }
 
-      if (candidate) {
-         return next(ApiError.badRequest('Пользователь с таким email уже существует'))
+            const candidateByUserName = await UserService.findUserByName(userName);
+            if (candidateByUserName) {
+               throw ApiError.badRequest('Пользователь с таким userName уже существует');
+            }
+
+            const hashPassword = await bcrypt.hash(password, 5);
+            const user = await UserService.createUser({ email, role, password: hashPassword, userName }, t);
+
+            const accessToken = generateAccessToken(user.id, user.email, user.role);
+            const refreshToken = generateRefreshToken(user.id, user.email, user.role);
+
+            const decodedRefresh = jwt.decode(refreshToken);
+            const tokenData = {
+               token: refreshToken,
+               userId: user.id,
+               expiresAt: new Date(decodedRefresh.exp * 1000),
+            };
+
+            await RefreshTokenService.createToken(tokenData, t);
+
+            res.cookie('accessToken', accessToken, {
+               httpOnly: true,
+               secure: process.env.NODE_ENV === 'production',
+               sameSite: 'Strict',
+               maxAge: 60 * 60 * 1000,
+            });
+
+            res.cookie('refreshToken', refreshToken, {
+               httpOnly: true,
+               secure: process.env.NODE_ENV === 'production',
+               sameSite: 'Strict',
+               maxAge: 30 * 24 * 60 * 60 * 1000,
+            });
+
+            return { id: user.id, email: user.email, role: user.role, userName: user.userName };
+         });
+
+         return res.json(result);
+      } catch (error) {
+         return next(error);
       }
-
-      const hashPassword = await bcrypt.hash(password, 5)
-      // const user = await User.create({ email, role, password: hashPassword })
-      const user = await UserService.createUser({ email, role, password: hashPassword, userName })
-
-      const token = generateJwt(user.id, user.email, user.role)
-      return res.json({ token })
    }
 
    async login(req, res, next) {
-      const { email, password } = req.body;
-      // const user = await User.findOne({ where: { email } })
+      try {
+         const { email, password } = req.body;
+         const result = await sequelize.transaction(async (t) => {
+            const user = await UserService.findUser(email);
+            if (!user) {
+               throw ApiError.unauthorized('Пользователь не найден');
+            }
 
-      const user = await UserService.findUser(email)
+            const comparePassword = bcrypt.compareSync(password, user.password);
+            if (!comparePassword) {
+               throw ApiError.unauthorized('Указан неверный пароль');
+            }
 
-      if (!user) {
-         return next(ApiError.internal('Пользователь не найден'))
+            const accessToken = generateAccessToken(user.id, user.email, user.role);
+            const refreshToken = generateRefreshToken(user.id, user.email, user.role);
+
+            const decodedRefresh = jwt.decode(refreshToken);
+            const tokenData = {
+               token: refreshToken,
+               userId: user.id,
+               expiresAt: new Date(decodedRefresh.exp * 1000),
+            };
+
+            await RefreshTokenService.createToken(tokenData, t);
+
+            res.cookie('accessToken', accessToken, {
+               httpOnly: true,
+               secure: process.env.NODE_ENV === 'production',
+               sameSite: 'Strict',
+               maxAge: 60 * 60 * 1000,
+            });
+
+            res.cookie('refreshToken', refreshToken, {
+               httpOnly: true,
+               secure: process.env.NODE_ENV === 'production',
+               sameSite: 'Strict',
+               maxAge: 30 * 24 * 60 * 60 * 1000,
+            });
+
+            return { id: user.id, email: user.email, role: user.role, userName: user.userName };
+         });
+
+         return res.json(result);
+      } catch (error) {
+         return next(error);
       }
-
-      let comparePassword = bcrypt.compareSync(password, user.password)
-
-      if (!comparePassword) {
-         return next(ApiError.internal('Указан неверный пароль'))
-      }
-
-      const token = generateJwt(user.id, user.email, user.role)
-
-      return res.json({ token })
-
    }
 
    async check(req, res, next) {
-      const token = generateJwt(req.user.id, req.user.email, req.user.role)
-      return res.json({ token })
+      const token = generateAccessToken(req.user.id, req.user.email, req.user.role);
+      return res.json({ token });
    }
 
-   async getUsers(req, res) {
-      const users = await UserService.getAllUsers();
-      return res.json(users)
+   async refresh(req, res, next) {
+      const refreshToken = req.cookies.refreshToken;
+      if (!refreshToken) {
+         return next(ApiError.unauthorized('Refresh токен не предоставлен'));
+      }
+
+      try {
+         const tokenFromDb = await RefreshTokenService.getOneToken(refreshToken);
+         if (!tokenFromDb) {
+            return next(ApiError.forbidden('Некорректный refresh токен'));
+         }
+
+         const userData = jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET);
+         const result = await sequelize.transaction(async (t) => {
+            await RefreshTokenService.deleteOneToken(refreshToken, t);
+
+            const newRefreshToken = generateRefreshToken(userData.id, userData.email, userData.role);
+            const decodedNew = jwt.decode(newRefreshToken);
+
+            await RefreshTokenService.createToken({
+               token: newRefreshToken,
+               userId: userData.id,
+               expiresAt: new Date(decodedNew.exp * 1000),
+            }, t);
+
+            const accessToken = generateAccessToken(userData.id, userData.email, userData.role);
+
+            res.cookie('accessToken', accessToken, {
+               httpOnly: true,
+               secure: process.env.NODE_ENV === 'production',
+               sameSite: 'Strict',
+               maxAge: 60 * 60 * 1000,
+            });
+
+            res.cookie('refreshToken', newRefreshToken, {
+               httpOnly: true,
+               secure: process.env.NODE_ENV === 'production',
+               sameSite: 'Strict',
+               maxAge: 30 * 24 * 60 * 60 * 1000,
+            });
+
+            return { accessToken };
+         });
+
+         return res.json(result);
+      } catch (e) {
+         await RefreshTokenService.deleteOneToken(refreshToken);
+         return next(ApiError.forbidden('Некорректный refresh токен'));
+      }
    }
 
-   // async updateUser(req, res, next) {
-   //    try {
-   //       const user = req.body
-   //       const { userAvatar } = req.files
-   //       const { id } = req.params
+   async logout(req, res, next) {
+      const refreshToken = req.cookies.refreshToken;
+      if (!refreshToken) {
+         return next(ApiError.badRequest('Refresh токен не предоставлен'));
+      }
 
-   //       let filename = uuid.v4() + '.jpg'
+      try {
+         await sequelize.transaction(async (t) => {
+            await RefreshTokenService.deleteOneToken(refreshToken, t);
+         });
 
-   //       if (userAvatar) {
-   //          userAvatar.mv(path.resolve(__dirname, '..', 'static', filename))
+         res.clearCookie('accessToken', { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'Strict' });
+         res.clearCookie('refreshToken', { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'Strict' });
 
-   //          user.userAvatar = filename;
-   //       }
-
-   //       const updatedUser = await UserService.updateUser(user, id)
-
-   //       return res.json(updatedUser)
-   //    } catch (e) {
-   //       next(ApiError.badRequest(e.message))
-   //    }
-   // }
+         return res.json({ message: 'Успешный выход из системы' });
+      } catch (error) {
+         return next(error);
+      }
+   }
 
    async updateUser(req, res, next) {
       try {
@@ -101,9 +232,6 @@ class UserController {
          if (req.file) {
             user.userAvatar = req.file.filename;
          }
-         // } else {
-         //    return next(ApiError.badRequest('Файл не найден.'));
-         // }
 
          const updatedUser = await UserService.updateUser(user, id);
          return res.json(updatedUser);
@@ -118,15 +246,80 @@ class UserController {
       return res.json(deletedUser);
    }
 
+   async updateOnboarding(req, res, next) {
+      try {
+         const { role, training_level, sport_specialization, skipped } = req.body;
+         const userId = req.user.id;
 
-   /*
+         console.log('🟡 updateOnboarding - полученные данные:', {
+            userId,
+            role,
+            training_level,
+            sport_specialization,
+            skipped
+         });
 
-   getUser
-   updateUser
-   deleteUser
+         // ✅ УПРОЩЕННАЯ ВАЛИДАЦИЯ - разрешаем 'skipped' как роль
+         const isSkipping = skipped === true;
+         const hasValidRole = role && ['trainee', 'trainer', 'skipped'].includes(role);
+         const hasTrainingData = training_level || sport_specialization;
 
-   */
+         if (!hasValidRole && !hasTrainingData && !isSkipping) {
+            return next(ApiError.badRequest('Необходимо передать роль (trainee, trainer или skipped) или данные для обучения'));
+         }
 
+         const result = await sequelize.transaction(async (t) => {
+            const user = await UserService.findUserById(userId);
+            if (!user) {
+               throw ApiError.notFound('Пользователь не найден');
+            }
+
+            const updateData = {};
+            let message = '';
+
+            // ✅ ПРИОРИТЕТ 1: Если передана роль (включая 'skipped')
+            if (role) {
+               updateData.role = role;
+               if (role === 'skipped') {
+                  message = 'Onboarding пропущен';
+                  console.log('🟢 Onboarding пропущен, устанавливаем role="skipped"');
+               } else {
+                  message = 'Данные onboarding успешно обновлены';
+                  console.log(`🟢 Onboarding завершен, роль установлена: ${role}`);
+               }
+            }
+            // ✅ ПРИОРИТЕТ 2: Если передано skipped: true (для обратной совместимости)
+            else if (isSkipping) {
+               updateData.role = 'skipped';
+               message = 'Onboarding пропущен';
+               console.log('🟢 Onboarding пропущен через skipped:true');
+            }
+
+            // Добавляем дополнительные данные, если переданы
+            if (training_level) updateData.training_level = training_level;
+            if (sport_specialization) updateData.sport_specialization = sport_specialization;
+
+            // Обновляем пользователя
+            const updatedUser = await UserService.updateUser(updateData, userId, t);
+
+            return {
+               id: updatedUser.id,
+               email: updatedUser.email,
+               role: updatedUser.role,
+               userName: updatedUser.userName,
+               training_level: updatedUser.training_level,
+               sport_specialization: updatedUser.sport_specialization,
+               message: message,
+               skipped: updatedUser.role === 'skipped'
+            };
+         });
+
+         return res.json(result);
+      } catch (error) {
+         console.error('🔴 Error in updateOnboarding:', error);
+         return next(ApiError.internal('Ошибка при обновлении данных onboarding'));
+      }
+   }
 }
 
-module.exports = new UserController()
+module.exports = new UserController();

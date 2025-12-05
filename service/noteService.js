@@ -1,68 +1,48 @@
-const ApiError = require('../error/ApiError');
-const { Note } = require('../models/models')
 
+const ApiError = require('../error/ApiError');
+const NoteRepository = require('../repository/noteRepository');
 
 class NoteService {
-
    async createNote(note) {
-      const createdNote = await Note.create(note)
-      return createdNote
+      // note уже содержит userId
+      return await NoteRepository.create(note);
    }
 
-
-   async getAllNotes(limit, offset) {
-
-      const allNotes = await Note.findAndCountAll({ limit, offset })
-
-      return allNotes
+   async getAllNotes(userId, limit, offset) {
+      // фильтрация по userId
+      return await NoteRepository.findAll(userId, limit, offset);
    }
 
-   async getOneNote(id) {
-      const foundNote = await Note.findOne(
-         {
-            where: { id }
-         },
-      )
-      return foundNote
+   async getOneNote(id, userId) {
+      return await NoteRepository.findOne(id, userId);
    }
 
-   async updateOneNote(note, id) {
-      const [updatedRowsCount, updatedRows] = await Note.update(
-         { ...note },
-         {
-            where: { id },
-            returning: true
-         }
-      )
-
-      return updatedRows[0].dataValues
-   }
-
-   // async deleteOneNote(id) {
-   //    await this.getOneNote(id)
-   //       .then((result) => {
-   //          Note.destroy({ where: { id } })
-   //          return result;
-   //       })
-   // }
-
-   async deleteOneNote(id) {
-      try {
-         const note = await this.getOneNote(id);
-
-         if (!note) {
-            throw new Error('Record not found');
-         }
-
-         await note.destroy();
-         console.log("Record deleted successfully");
-      } catch (err) {
-         console.error('Error deleting record: ', err);
-         throw err; // Пробрасываем ошибку дальше
+   async updateOneNote(note, id, userId) {
+      // сначала проверим, что заметка принадлежит пользователю
+      const existingNote = await this.getOneNote(id, userId);
+      if (!existingNote) {
+         throw ApiError.badRequest('Запись не найдена или нет доступа');
       }
+
+      const [updatedRowsCount, updatedRows] = await NoteRepository.update(note, id, userId);
+      if (updatedRowsCount === 0) {
+         throw ApiError.badRequest('Запись не найдена для обновления');
+      }
+      return updatedRows[0]; // возвращаем обновлённый объект
    }
 
+   async deleteOneNote(id, userId) {
+      const note = await this.getOneNote(id, userId);
+      if (!note) {
+         throw ApiError.badRequest('Запись не найдена или нет доступа');
+      }
+      const deletedCount = await NoteRepository.destroyById(id, userId);
+      if (deletedCount === 0) {
+         throw ApiError.badRequest('Не удалось удалить запись');
+      }
+      console.log('Record deleted successfully');
+      return true;  // Возвращаем true, если удалено успешно
+   }
 }
-
 
 module.exports = new NoteService();

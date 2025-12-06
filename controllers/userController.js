@@ -248,7 +248,21 @@ class UserController {
 
    async updateOnboarding(req, res, next) {
       try {
-         const { role, training_level, sport_specialization, skipped } = req.body;
+         console.log('=====================================');
+         console.log('🟡 updateOnboarding - ПОЛНЫЙ req.body:', JSON.stringify(req.body, null, 2));
+         console.log('=====================================');
+
+         // ✅ ДОБАВЬ ВСЕ ПОЛЯ В ДЕСТРУКТУРИЗАЦИЮ!
+         const {
+            role,
+            training_level,
+            sport_specialization,
+            skipped,
+            userName,           // ✅ ДОБАВЬ
+            birthDate,          // ✅ ДОБАВЬ
+            allow_connections   // ✅ ДОБАВЬ
+         } = req.body;
+
          const userId = req.user.id;
 
          console.log('🟡 updateOnboarding - полученные данные:', {
@@ -256,7 +270,10 @@ class UserController {
             role,
             training_level,
             sport_specialization,
-            skipped
+            skipped,
+            userName,           // Теперь будет определено
+            birthDate,          // Теперь будет определено
+            allow_connections   // Теперь будет определено
          });
 
          // ✅ УПРОЩЕННАЯ ВАЛИДАЦИЯ - разрешаем 'skipped' как роль
@@ -298,15 +315,28 @@ class UserController {
             // Добавляем дополнительные данные, если переданы
             if (training_level) updateData.training_level = training_level;
             if (sport_specialization) updateData.sport_specialization = sport_specialization;
+            if (userName !== undefined) updateData.userName = userName;
+            if (birthDate !== undefined) updateData.birthDate = birthDate;
+            if (allow_connections !== undefined) updateData.allow_connections = allow_connections;
+
+            console.log('🟡 updateOnboarding - updateData для сохранения:', updateData);
 
             // Обновляем пользователя
             const updatedUser = await UserService.updateUser(updateData, userId, t);
+
+            console.log('🟡 updateOnboarding - результат updateUser:');
+            console.log('userName:', updatedUser.userName);
+            console.log('birthDate:', updatedUser.birthDate);
+            console.log('allow_connections:', updatedUser.allow_connections);
+            console.log('Полный объект:', JSON.stringify(updatedUser, null, 2));
 
             return {
                id: updatedUser.id,
                email: updatedUser.email,
                role: updatedUser.role,
                userName: updatedUser.userName,
+               birthDate: updatedUser.birthDate,  // ✅ ДОБАВЬ В ОТВЕТ
+               allow_connections: updatedUser.allow_connections,  // ✅ ДОБАВЬ В ОТВЕТ
                training_level: updatedUser.training_level,
                sport_specialization: updatedUser.sport_specialization,
                message: message,

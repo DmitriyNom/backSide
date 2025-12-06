@@ -11,7 +11,7 @@ class UserRepository {
    }
 
    async findUserById(id) {
-      return await User.findOne({ where: id })
+      return await User.findOne({ where: { id } }); // ✅ ИСПРАВЛЕНО
    }
 
    async getAllUsers() {
@@ -23,22 +23,24 @@ class UserRepository {
    }
 
    async updateUser(user, id, transaction = null) {
-      return User.update(
+      const [updatedRowsCount, updatedRows] = await User.update(
          { ...user },
          {
             where: { id },
             returning: true,
-            transaction // ДОБАВЛЯЕМ ПОДДЕРЖКУ ТРАНЗАКЦИЙ
+            transaction
          }
       );
+
+      console.log('🟡 UserRepository.updateUser - результат:');
+      console.log('updatedRowsCount:', updatedRowsCount);
+      console.log('updatedRows[0]:', updatedRows[0]);
+
+      return [updatedRowsCount, updatedRows];
    }
 
    async deleteUser(id) {
       return await User.destroy({ where: { id } });
-   }
-
-   async findUserById(id) {
-      return await User.findOne({ where: { id } });
    }
 }
 

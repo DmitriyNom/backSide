@@ -14,7 +14,10 @@ router.put('/onboarding',
       body('role').optional().isIn(['trainee', 'trainer', 'skipped']).withMessage('Роль должна быть trainee, trainer или skipped'),
       body('training_level').optional().isIn(['beginner', 'amateur', 'advanced', 'professional']).withMessage('Некорректный уровень тренировок'),
       body('sport_specialization').optional().isString().isLength({ max: 100 }).withMessage('Специализация должна быть строкой до 100 символов'),
-      body('skipped').optional().isBoolean().withMessage('Поле skipped должно быть булевым значением')
+      body('skipped').optional().isBoolean().withMessage('Поле skipped должно быть булевым значением'),
+      body('userName').optional().isString().isLength({ min: 2, max: 50 }),
+      body('birthDate').optional().isISO8601(),
+      body('allow_connections').optional().isBoolean()
    ],
    userController.updateOnboarding
 );

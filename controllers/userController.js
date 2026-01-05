@@ -1,5 +1,5 @@
 const ApiError = require('../error/ApiError');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 const UserService = require('../service/userService');
 const RefreshTokenService = require('../service/refreshTokenService');
 const sequelize = require('../db');

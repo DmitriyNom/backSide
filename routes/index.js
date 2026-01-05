@@ -9,6 +9,7 @@ const routes = [
    { path: '/notes', router: require('./noteRouter') },
    { path: '/noteGroup', router: require('./noteGroupRouter') },
    { path: '/exerciseGroup', router: require('./exerciseGroupRouter') },
+   { path: '/media', router: require('./mediaRouter') },
 
    // { path: '/userNote', router: require('./userNoteRouter') },
    // { path: '/userExercise', router: require('./userExerciseRouter') },

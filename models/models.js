@@ -170,7 +170,140 @@ const Note = sequelize.define("note", {
    note_mark: { type: DataTypes.STRING }
 });
 
+// ==================== MEDIA MODEL ====================
+const Media = sequelize.define('media', {
+   id: {
+      type: DataTypes.UUID,
+      defaultValue: DataTypes.UUIDV4,
+      primaryKey: true
+   },
+   user_id: {
+      type: DataTypes.INTEGER,  // У вас используется INTEGER для User.id
+      allowNull: false,
+      references: {
+         model: User,
+         key: 'id'
+      }
+   },
+   original_filename: {
+      type: DataTypes.STRING(500),
+      allowNull: false
+   },
+   storage_url: {
+      type: DataTypes.TEXT,
+      allowNull: false
+   },
+   file_type: {
+      type: DataTypes.ENUM('photo', 'video'),
+      allowNull: false
+   },
+   mime_type: {
+      type: DataTypes.STRING(100),
+      allowNull: false
+   },
+   size: {
+      type: DataTypes.INTEGER,
+      allowNull: false
+   },
+   duration: {
+      type: DataTypes.INTEGER,
+      allowNull: true
+   },
+   thumbnail_url: {
+      type: DataTypes.TEXT,
+      allowNull: true
+   },
+   metadata: {
+      type: DataTypes.JSONB,
+      defaultValue: {}
+   },
+   privacy: {
+      type: DataTypes.ENUM('private', 'public'),
+      defaultValue: 'private'
+   },
+   allow_reshare: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: true
+   },
+   source_type: {
+      type: DataTypes.ENUM('original', 'shared'),
+      defaultValue: 'original'
+   },
+   original_media_id: {
+      type: DataTypes.UUID,
+      allowNull: true,
+      references: {
+         model: 'media',  // Самоссылающаяся связь
+         key: 'id'
+      }
+   },
+   shared_count: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0
+   },
+   uploaded_at: {
+      type: DataTypes.DATE,
+      defaultValue: DataTypes.NOW
+   }
+}, {
+   tableName: 'media',
+   underscored: true,
+   timestamps: true,
+   createdAt: 'created_at',
+   updatedAt: 'updated_at'
+});
+
+// Ассоциации для Media
+User.hasMany(Media, {
+   foreignKey: 'user_id',
+   onDelete: 'CASCADE',
+   as: 'media'
+});
+Media.belongsTo(User, {
+   foreignKey: 'user_id',
+   as: 'owner'
+});
+
+// Самоссылающаяся связь для репостов
+Media.belongsTo(Media, {
+   foreignKey: 'original_media_id',
+   as: 'originalMedia',
+   onDelete: 'SET NULL'
+});
+Media.hasMany(Media, {
+   foreignKey: 'original_media_id',
+   as: 'sharedCopies'
+});
+
 // Ассоциации
+
+
+Media.belongsToMany(Exercise, {
+   through: 'exercise_media',
+   foreignKey: 'media_id',
+   otherKey: 'exercise_id',
+   as: 'exercises'
+});
+Exercise.belongsToMany(Media, {
+   through: 'exercise_media',
+   foreignKey: 'exercise_id',
+   otherKey: 'media_id',
+   as: 'media'
+});
+
+
+Media.belongsToMany(Note, {
+   through: 'note_media',
+   foreignKey: 'media_id',
+   otherKey: 'note_id',
+   as: 'notes'
+});
+Note.belongsToMany(Media, {
+   through: 'note_media',
+   foreignKey: 'note_id',
+   otherKey: 'media_id',
+   as: 'media'
+});
 
 User.hasMany(Exercise, {
    foreignKey: 'user_id',
@@ -231,5 +364,7 @@ module.exports = {
    ExerciseGroup,
    Note,
    NoteGroup,
-   RefreshToken
+   RefreshToken,
+   Media,
+   ConnectionRequest
 }

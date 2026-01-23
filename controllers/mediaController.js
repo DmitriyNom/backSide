@@ -1,4 +1,5 @@
-const MediaService = require('../service/mediaService');
+// controllers/mediaController.js
+const MediaService = require('../service/MediaService'); // Единый сервис
 const ApiError = require('../error/ApiError');
 
 class MediaController {
@@ -23,16 +24,18 @@ class MediaController {
             finalIsPublic = privacy === 'public';
          }
 
+         // Используем единый MediaService
          const result = await MediaService.createUploadRequest(userId, {
             filename,
             fileType,
             mimeType,
             size: parseInt(size),
-            isPublic: finalIsPublic  // Передаем вычисленное значение
+            isPublic: finalIsPublic
          });
 
          return res.json(result);
       } catch (error) {
+         console.error('❌ Error in generateUploadRequest:', error);
          next(ApiError.badRequest(error.message));
       }
    }
@@ -46,9 +49,11 @@ class MediaController {
             return next(ApiError.badRequest('Missing mediaId'));
          }
 
+         // Используем единый MediaService
          const result = await MediaService.confirmUpload(userId, mediaId);
          return res.json(result);
       } catch (error) {
+         console.error('❌ Error in confirmUpload:', error);
          next(ApiError.badRequest(error.message));
       }
    }
@@ -58,6 +63,7 @@ class MediaController {
          const userId = req.user.id;
          const { fileType, limit = 50, offset = 0 } = req.query;
 
+         // Используем единый MediaService
          const result = await MediaService.getUserMedia(userId, {
             fileType,
             limit: parseInt(limit),
@@ -66,6 +72,7 @@ class MediaController {
 
          return res.json(result);
       } catch (error) {
+         console.error('❌ Error in getMyMedia:', error);
          next(ApiError.internal(error.message));
       }
    }
@@ -79,9 +86,11 @@ class MediaController {
             return next(ApiError.badRequest('Missing mediaId'));
          }
 
+         // Используем MediaService для логики шаринга
          const result = await MediaService.shareMedia(userId, mediaId);
          return res.json(result);
       } catch (error) {
+         console.error('❌ Error in shareMedia:', error);
          next(ApiError.badRequest(error.message));
       }
    }
@@ -95,9 +104,11 @@ class MediaController {
             return next(ApiError.badRequest('Missing media id'));
          }
 
+         // Используем единый MediaService
          const result = await MediaService.deleteMedia(userId, id);
          return res.json(result);
       } catch (error) {
+         console.error('❌ Error in deleteMedia:', error);
          next(ApiError.badRequest(error.message));
       }
    }
@@ -116,10 +127,12 @@ class MediaController {
             return next(ApiError.badRequest('Invalid privacy value'));
          }
 
+         // Используем единый MediaService
          const result = await MediaService.setMediaPrivacy(userId, id, privacy);
          return res.json(result);
       } catch (error) {
-         next(ApiError.badRequest(error.message));
+         console.error(`❌ Error changing privacy for media ${id}:`, error.message);
+         next(ApiError.badRequest(`Failed to change privacy: ${error.message}`));
       }
    }
 }

@@ -244,9 +244,72 @@ const Media = sequelize.define('media', {
    uploaded_at: {
       type: DataTypes.DATE,
       defaultValue: DataTypes.NOW
+   },
+   shared_with_friends: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false
+   },
+   shared_with_trainees: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false
+   },
+   default_access_level: {
+      type: DataTypes.ENUM('view', 'download'),
+      defaultValue: 'view'
    }
 }, {
    tableName: 'media',
+   underscored: true,
+   timestamps: true,
+   createdAt: 'created_at',
+   updatedAt: 'updated_at'
+});
+
+
+const MediaAccessGrant = sequelize.define('media_access_grant', {
+   id: {
+      type: DataTypes.UUID,
+      defaultValue: DataTypes.UUIDV4,
+      primaryKey: true
+   },
+   media_id: {
+      type: DataTypes.UUID,
+      allowNull: false,
+      references: {
+         model: Media,
+         key: 'id'
+      }
+   },
+   grantor_id: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      references: {
+         model: User,
+         key: 'id'
+      }
+   },
+   grantee_id: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      references: {
+         model: User,
+         key: 'id'
+      }
+   },
+   access_level: {
+      type: DataTypes.ENUM('view', 'download', 'comment'),
+      defaultValue: 'view'
+   },
+   expires_at: {
+      type: DataTypes.DATE,
+      allowNull: true
+   },
+   status: {
+      type: DataTypes.ENUM('active', 'revoked', 'expired'),
+      defaultValue: 'active'
+   }
+}, {
+   tableName: 'media_access_grants',
    underscored: true,
    timestamps: true,
    createdAt: 'created_at',
@@ -358,6 +421,37 @@ Note.belongsTo(NoteGroup, {
    foreignKey: 'note_group_id'
 });
 
+Media.hasMany(MediaAccessGrant, {
+   foreignKey: 'media_id',
+   as: 'accessGrants',
+   onDelete: 'CASCADE'
+});
+
+MediaAccessGrant.belongsTo(Media, {
+   foreignKey: 'media_id',
+   as: 'media'
+});
+
+User.hasMany(MediaAccessGrant, {
+   foreignKey: 'grantor_id',
+   as: 'grantedAccesses'
+});
+
+MediaAccessGrant.belongsTo(User, {
+   foreignKey: 'grantor_id',
+   as: 'grantor'
+});
+
+User.hasMany(MediaAccessGrant, {
+   foreignKey: 'grantee_id',
+   as: 'receivedAccesses'
+});
+
+MediaAccessGrant.belongsTo(User, {
+   foreignKey: 'grantee_id',
+   as: 'grantee'
+});
+
 module.exports = {
    User,
    Exercise,
@@ -366,5 +460,6 @@ module.exports = {
    NoteGroup,
    RefreshToken,
    Media,
-   ConnectionRequest
+   ConnectionRequest,
+   MediaAccessGrant
 }

@@ -1,3 +1,4 @@
+// routes/index.js
 const Router = require('express');
 const router = Router();
 const ApiError = require('../error/ApiError');
@@ -10,6 +11,7 @@ const routes = [
    { path: '/noteGroup', router: require('./noteGroupRouter') },
    { path: '/exerciseGroup', router: require('./exerciseGroupRouter') },
    { path: '/media', router: require('./mediaRouter') },
+   // УДАЛЕНО: { path: '/files', router: require('./fileUploadRouter') },
 
    // { path: '/userNote', router: require('./userNoteRouter') },
    // { path: '/userExercise', router: require('./userExerciseRouter') },
@@ -23,7 +25,6 @@ const routes = [
    // { path: '/workoutExercise', router: require('./workoutExerciseRouter') },
    // { path: '/mood', router: require('./moodRouter') },
    // { path: '/hydration', router: require('./hydrationRouter') },
-
 ];
 
 // Маршрутизаторы

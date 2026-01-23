@@ -112,6 +112,7 @@ class MinioService {
    async deleteFile(objectName, usePublic = false) {
       const bucket = usePublic ? this.publicBucketName : this.bucketName;
       await this.client.removeObject(bucket, objectName);
+      console.log(`🗑️ Deleted file: ${bucket}/${objectName}`);
    }
 
    generateObjectName(userId, filename, fileType) {
@@ -128,6 +129,76 @@ class MinioService {
    async getFileMetadata(objectName, usePublic = false) {
       const bucket = usePublic ? this.publicBucketName : this.bucketName;
       return await this.client.statObject(bucket, objectName);
+   }
+
+   // НОВЫЙ МЕТОД: Копирование объекта между бакетами
+   async copyObject(sourceBucket, sourceObject, destBucket, destObject) {
+      try {
+         console.log(`📋 Copying object: ${sourceBucket}/${sourceObject} -> ${destBucket}/${destObject}`);
+
+         // Используем метод copyObject MinIO
+         await this.client.copyObject(
+            destBucket,
+            destObject,
+            `/${sourceBucket}/${sourceObject}`
+         );
+
+         console.log(`✅ Successfully copied: ${sourceBucket}/${sourceObject} to ${destBucket}/${destObject}`);
+         return true;
+      } catch (error) {
+         console.error(`❌ Error copying object ${sourceBucket}/${sourceObject}:`, error.message);
+         throw new Error(`Copy failed: ${error.message}`);
+      }
+   }
+
+   // НОВЫЙ МЕТОД: Перемещение объекта между бакетами
+   async moveObject(sourceBucket, sourceObject, destBucket, destObject) {
+      try {
+         console.log(`🚚 Moving object: ${sourceBucket}/${sourceObject} -> ${destBucket}/${destObject}`);
+
+         // 1. Копируем файл
+         await this.copyObject(sourceBucket, sourceObject, destBucket, destObject);
+
+         // 2. Удаляем оригинал (только если копирование успешно)
+         await this.client.removeObject(sourceBucket, sourceObject);
+
+         console.log(`✅ Successfully moved: ${sourceBucket}/${sourceObject} to ${destBucket}/${destObject}`);
+         return true;
+      } catch (error) {
+         console.error(`❌ Error moving object ${sourceBucket}/${sourceObject}:`, error.message);
+
+         // Пытаемся удалить скопированный файл, если он существует (чтобы избежать дубликатов)
+         try {
+            await this.client.removeObject(destBucket, destObject);
+         } catch (cleanupError) {
+            // Игнорируем ошибку очистки
+         }
+
+         throw new Error(`Move failed: ${error.message}`);
+      }
+   }
+
+   // НОВЫЙ МЕТОД: Получение политики бакета
+   async getBucketPolicy(bucketName) {
+      try {
+         return await this.client.getBucketPolicy(bucketName);
+      } catch (error) {
+         console.warn(`⚠️ Could not get policy for bucket ${bucketName}:`, error.message);
+         return null;
+      }
+   }
+
+   // НОВЫЙ МЕТОД: Проверка существования объекта
+   async objectExists(bucketName, objectName) {
+      try {
+         await this.client.statObject(bucketName, objectName);
+         return true;
+      } catch (error) {
+         if (error.code === 'NotFound') {
+            return false;
+         }
+         throw error;
+      }
    }
 
    async testConnection() {

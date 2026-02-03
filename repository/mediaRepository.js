@@ -41,8 +41,22 @@ class MediaRepository {
       });
    }
 
+   // Метод для обновления медиа с проверкой прав доступа
+   async updateByIdAndUser(id, userId, updateData) {
+      const media = await Media.findOne({
+         where: { id, user_id: userId }
+      });
+
+      if (!media) {
+         throw new Error('Media not found or access denied');
+      }
+
+      return await media.update(updateData);
+   }
+
+   // Старый метод для обратной совместимости (без проверки пользователя)
    async update(id, updateData) {
-      const media = await this.findById(id);
+      const media = await Media.findByPk(id);
       if (!media) return null;
 
       return await media.update(updateData);

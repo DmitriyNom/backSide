@@ -135,6 +135,46 @@ class MediaController {
          next(ApiError.badRequest(`Failed to change privacy: ${error.message}`));
       }
    }
+
+   async updateMedia(req, res, next) {
+      try {
+         const userId = req.user.id;
+         const { id } = req.params;
+         const updateData = req.body;
+
+         // Валидация
+         if (!id) {
+            return next(ApiError.badRequest('Missing media id'));
+         }
+
+         if (!updateData || Object.keys(updateData).length === 0) {
+            return next(ApiError.badRequest('No data to update'));
+         }
+
+         // Валидация полей (опционально, можно убрать или расширить)
+         const allowedFields = ['original_filename', 'privacy', 'description', 'tags'];
+         const invalidFields = Object.keys(updateData).filter(field => !allowedFields.includes(field));
+
+         if (invalidFields.length > 0) {
+            return next(ApiError.badRequest(`Invalid fields: ${invalidFields.join(', ')}. Allowed: ${allowedFields.join(', ')}`));
+         }
+
+         // Проверка значения privacy, если оно есть в updateData
+         if (updateData.privacy && !['private', 'public'].includes(updateData.privacy)) {
+            return next(ApiError.badRequest('Invalid privacy value. Must be "private" or "public"'));
+         }
+
+         // Используем единый MediaService
+         const result = await MediaService.updateMedia(userId, id, updateData);
+         return res.json(result);
+      } catch (error) {
+         console.error(`❌ Error updating media ${req.params.id}:`, error.message);
+         next(ApiError.badRequest(`Failed to update media: ${error.message}`));
+      }
+   }
+
 }
+
+
 
 module.exports = new MediaController();

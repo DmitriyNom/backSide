@@ -57,6 +57,7 @@ router.post('/upload-request', mediaController.generateUploadRequest);
 router.post('/confirm', mediaController.confirmUpload);
 router.get('/my', mediaController.getMyMedia);
 router.delete('/:id', mediaController.deleteMedia);
+router.put('/:id', mediaController.updateMedia);
 router.put('/:id/privacy', mediaController.setPrivacy);
 router.post('/:mediaId/share', mediaController.shareMedia);
 

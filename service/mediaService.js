@@ -228,7 +228,7 @@ class MediaService {
       // Получаем метаданные
       const stats = await fs.stat(filePath);
 
-      await this.mediaRepo.update(mediaId, {
+      await this.mediaRepo.updateByIdAndUser(mediaId, userId, {
          uploaded_at: new Date(),
          size: stats.size,
          metadata: {
@@ -401,7 +401,7 @@ class MediaService {
       await fs.rename(currentPath, newPath);
 
       // Обновляем запись в БД
-      const updatedMedia = await this.mediaRepo.update(mediaId, {
+      const updatedMedia = await this.mediaRepo.updateByIdAndUser(mediaId, userId, {
          privacy: privacy,
          storage_url: newStorageUrl,
          metadata: {
@@ -412,6 +412,128 @@ class MediaService {
       });
 
       return updatedMedia;
+   }
+
+   // Метод для обновления медиа (вызывается из контроллера)
+   async updateMedia(userId, mediaId, updateData) {
+      // 1. Проверяем, что пользователь имеет доступ к медиа
+      const media = await this.mediaRepo.findByIdAndUser(mediaId, userId);
+      if (!media) {
+         throw new Error('Media not found or access denied');
+      }
+
+      // 2. Подготавливаем данные для обновления
+      const updateFields = {};
+
+      // Обрабатываем original_filename (проверяем расширение)
+      if (updateData.original_filename) {
+         const newFilename = updateData.original_filename;
+         const currentExtension = path.extname(media.original_filename);
+         const newExtension = path.extname(newFilename);
+
+         // Проверяем, что расширение не изменилось
+         if (currentExtension.toLowerCase() !== newExtension.toLowerCase()) {
+            throw new Error('Cannot change file extension');
+         }
+
+         // Проверяем длину имени (по модели STRING(500))
+         if (newFilename.length > 500) {
+            throw new Error('Filename is too long (max 500 characters)');
+         }
+
+         updateFields.original_filename = newFilename;
+      }
+
+      // Обрабатываем privacy (используем существующий метод)
+      if (updateData.privacy && media.privacy !== updateData.privacy) {
+         // Используем существующий метод для смены приватности
+         // (он перемещает файлы между папками и обновляет storage_url)
+         await this.setMediaPrivacy(userId, mediaId, updateData.privacy);
+         // setMediaPrivacy уже обновит privacy в БД, так что не добавляем здесь
+      } else if (updateData.privacy) {
+         // Если privacy передано, но не изменилось - просто добавляем
+         updateFields.privacy = updateData.privacy;
+      }
+
+      // Обрабатываем metadata (description и tags)
+      let hasMetadataUpdate = false;
+      const metadata = { ...(media.metadata || {}) };
+
+      // Добавляем description если передано
+      if (updateData.description !== undefined) {
+         metadata.description = updateData.description;
+         hasMetadataUpdate = true;
+      }
+
+      // Добавляем tags если передано
+      if (updateData.tags !== undefined) {
+         // Нормализуем теги: убираем пустые, обрезаем длину
+         if (Array.isArray(updateData.tags)) {
+            metadata.tags = [...new Set(
+               updateData.tags
+                  .filter(tag => tag && tag.trim())
+                  .map(tag => tag.substring(0, 100))
+            )];
+         } else if (updateData.tags === null || updateData.tags === '') {
+            metadata.tags = [];
+         } else {
+            // Если пришло не массивом, игнорируем
+            metadata.tags = media.metadata?.tags || [];
+         }
+         hasMetadataUpdate = true;
+      }
+
+      // Если есть изменения в metadata - добавляем в updateFields
+      if (hasMetadataUpdate) {
+         metadata.last_updated = new Date().toISOString();
+         updateFields.metadata = metadata;
+      }
+
+      // 3. Если есть поля для обновления - обновляем в БД
+      if (Object.keys(updateFields).length > 0) {
+         // Обновляем запись в БД
+         const updatedMedia = await this.mediaRepo.updateByIdAndUser(mediaId, userId, updateFields);
+
+         // 4. Возвращаем обновлённое медиа с URL
+         return await this.enrichMediaWithUrls(updatedMedia);
+      }
+
+      // 5. Если ничего не изменилось, возвращаем текущее медиа
+      return await this.enrichMediaWithUrls(media);
+   }
+
+   // Вспомогательный метод для добавления URL к медиа
+   async enrichMediaWithUrls(media) {
+      try {
+         // Парсим storage_url
+         const [bucketType, accessType, ...objectParts] = media.storage_url.split('/');
+         const objectName = objectParts.join('/');
+         const isPublic = bucketType === 'media' && accessType === 'public';
+
+         const downloadUrl = await this.generateDownloadUrl(objectName, isPublic);
+         const publicUrl = this.getPublicUrl(objectName, isPublic);
+
+         return {
+            ...media.toJSON(),
+            id: media.id,
+            downloadUrl,
+            publicUrl,
+            isPublic: isPublic,
+            bucket: `${bucketType}/${accessType}`,
+            category: media.metadata?.category || this.getFileCategory(media.original_filename)
+         };
+      } catch (error) {
+         // Если не удалось получить URL, возвращаем базовую информацию
+         console.error('Error enriching media with URLs:', error);
+         return {
+            ...media.toJSON(),
+            id: media.id,
+            downloadUrl: null,
+            publicUrl: null,
+            isPublic: media.privacy === 'public',
+            category: media.metadata?.category || this.getFileCategory(media.original_filename)
+         };
+      }
    }
 
    // Метод для шаринга медиа
@@ -453,7 +575,7 @@ class MediaService {
       const directUrl = this.getPublicUrl(objectName, true);
 
       // Обновляем запись в БД
-      await this.mediaRepo.update(mediaId, {
+      await this.mediaRepo.updateByIdAndUser(mediaId, userId, {
          metadata: {
             ...(media.metadata || {}),
             shared: true,

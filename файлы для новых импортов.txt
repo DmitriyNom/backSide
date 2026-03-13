@@ -1,0 +1,26 @@
+команда ls -r *.js | sls "require\(.*models/models.*\)"
+
+
+controllers\connectionController.js:4:const { User } = require('../models/models');
+repository\exerciseGroupRepository.js:1:const { ExerciseGroup } = require('../models/models');
+repository\exerciseRepository.js:1:const { Exercise } = require('../models/models');
+repository\mediaRepository.js:2:const { Media, User } = require('../models/models');
+repository\noteGroupRepository.js:1:const { NoteGroup } = require('../models/models');
+repository\noteRepository.js:1:// const { Note } = require('../models/models');
+repository\noteRepository.js:51:const { Note, User, Media } = require('../models/models');        
+repository\refreshTokenRepository.js:1:const { RefreshToken } = require('../models/models');      
+repository\userConnectionRepository.js:2:const { UserConnection, User, ConnectionRequest } = requ 
+ire('../models/models');
+repository\userRepository.js:2:const { User } = require('../models/models');
+seeders\testConnections.js:2:const { User, UserConnection, Note } = require('../models/models');  
+service\connectionService.js:5:const { User } = require('../models/models');
+service\connectionService.js:7:const { ConnectionRequest } = require('../models/models');
+test\modelsTests\models.test.js:16:} = require('../../models/models');
+test\repositoryTests\exerciseRepository.test.js:2:const { Exercise } = require('../../models/mode 
+ls');
+test\repositoryTests\noteRepository.test.js:3:const { Note } = require('../../models/models');    
+test\repositoryTests\userRepository.test.js:3:const { User } = require('../../models/models');    
+test\serviceTests\exerciseService.test.js:2:// const { Exercise } = require('../../models/models' 
+);
+test\serviceTests\userService.test.js:2:// const { User } = require('../../models/models');       
+index.js:4:const models = require("./models/models");

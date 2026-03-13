@@ -1,4 +1,4 @@
-const { NoteGroup } = require('../models/models');
+const { NoteGroup } = require('../models/legacy_models');
 
 class NoteGroupRepository {
    async create(noteGroup) {

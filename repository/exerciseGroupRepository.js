@@ -1,4 +1,4 @@
-const { ExerciseGroup } = require('../models/models');
+const { ExerciseGroup } = require('../models/legacy_models');
 
 class ExerciseGroupRepository {
    async create(exerciseGroup) {

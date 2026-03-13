@@ -1,5 +1,5 @@
 // repositories/UserRepository.js
-const { User } = require('../models/models');
+const { User } = require('../models/legacy_models');
 
 class UserRepository {
    async findUser(email) {

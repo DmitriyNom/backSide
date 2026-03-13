@@ -1,4 +1,4 @@
-const { RefreshToken } = require('../models/models');
+const { RefreshToken } = require('../models/legacy_models');
 
 class RefreshTokenRepository {
    async create(token, transaction) {

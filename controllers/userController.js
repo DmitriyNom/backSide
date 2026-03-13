@@ -224,6 +224,25 @@ class UserController {
       }
    }
 
+   // async updateUser(req, res, next) {
+   //    try {
+   //       const user = req.body;
+   //       const { id } = req.params;
+
+   //       if (req.file) {
+   //          user.userAvatar = req.file.filename;
+   //       }
+
+   //       const updatedUser = await UserService.updateUser(user, id);
+   //       return res.json(updatedUser);
+   //    } catch (e) {
+   //       next(ApiError.badRequest(e.message));
+   //    }
+   // }
+
+   /**
+ * ОБНОВЛЕНИЕ ПРОФИЛЯ (updateUser)
+ */
    async updateUser(req, res, next) {
       try {
          const user = req.body;
@@ -233,12 +252,66 @@ class UserController {
             user.userAvatar = req.file.filename;
          }
 
+         // Получаем старого пользователя для сравнения роли
+         const oldUser = await UserService.findUserById(id);
+         const oldRole = oldUser?.role;
+
          const updatedUser = await UserService.updateUser(user, id);
+
+         // Проверяем, изменилась ли роль
+         const newRole = updatedUser.role;
+
+         console.log('🟡 updateUser - старая роль:', oldRole, 'новая роль:', newRole);
+
+         // Если роль изменилась - перевыпускаем токены!
+         if (oldRole !== newRole) {
+            console.log('🟢 Роль изменилась, перевыпускаем токены');
+
+            // Генерируем новые токены с актуальной ролью
+            const accessToken = generateAccessToken(updatedUser.id, updatedUser.email, updatedUser.role);
+            const refreshToken = generateRefreshToken(updatedUser.id, updatedUser.email, updatedUser.role);
+
+            // Удаляем старый refresh токен из БД
+            const oldRefreshToken = req.cookies.refreshToken;
+            if (oldRefreshToken) {
+               await RefreshTokenService.deleteOneToken(oldRefreshToken);
+            }
+
+            // Сохраняем новый refresh токен в БД
+            const decodedRefresh = jwt.decode(refreshToken);
+            await RefreshTokenService.createToken({
+               token: refreshToken,
+               userId: updatedUser.id,
+               expiresAt: new Date(decodedRefresh.exp * 1000),
+            });
+
+            // Устанавливаем новые токены в cookies
+            res.cookie('accessToken', accessToken, {
+               httpOnly: true,
+               secure: process.env.NODE_ENV === 'production',
+               sameSite: 'Strict',
+               maxAge: 60 * 60 * 1000,
+            });
+
+            res.cookie('refreshToken', refreshToken, {
+               httpOnly: true,
+               secure: process.env.NODE_ENV === 'production',
+               sameSite: 'Strict',
+               maxAge: 30 * 24 * 60 * 60 * 1000,
+            });
+
+            console.log('✅ Новые токены установлены с ролью:', updatedUser.role);
+         }
+
          return res.json(updatedUser);
       } catch (e) {
          next(ApiError.badRequest(e.message));
       }
    }
+
+   /**
+    * ОНБОРДИНГ (updateOnboarding)
+    */
 
    async deleteUser(req, res) {
       const { id } = req.params;
@@ -246,21 +319,125 @@ class UserController {
       return res.json(deletedUser);
    }
 
+   // async updateOnboarding(req, res, next) {
+   //    try {
+   //       console.log('=====================================');
+   //       console.log('🟡 updateOnboarding - ПОЛНЫЙ req.body:', JSON.stringify(req.body, null, 2));
+   //       console.log('=====================================');
+
+   //       // ✅ ДОБАВЬ ВСЕ ПОЛЯ В ДЕСТРУКТУРИЗАЦИЮ!
+   //       const {
+   //          role,
+   //          training_level,
+   //          sport_specialization,
+   //          skipped,
+   //          userName,           // ✅ ДОБАВЬ
+   //          birthDate,          // ✅ ДОБАВЬ
+   //          allow_connections   // ✅ ДОБАВЬ
+   //       } = req.body;
+
+   //       const userId = req.user.id;
+
+   //       console.log('🟡 updateOnboarding - полученные данные:', {
+   //          userId,
+   //          role,
+   //          training_level,
+   //          sport_specialization,
+   //          skipped,
+   //          userName,           // Теперь будет определено
+   //          birthDate,          // Теперь будет определено
+   //          allow_connections   // Теперь будет определено
+   //       });
+
+   //       // ✅ УПРОЩЕННАЯ ВАЛИДАЦИЯ - разрешаем 'skipped' как роль
+   //       const isSkipping = skipped === true;
+   //       const hasValidRole = role && ['trainee', 'trainer', 'skipped'].includes(role);
+   //       const hasTrainingData = training_level || sport_specialization;
+
+   //       if (!hasValidRole && !hasTrainingData && !isSkipping) {
+   //          return next(ApiError.badRequest('Необходимо передать роль (trainee, trainer или skipped) или данные для обучения'));
+   //       }
+
+   //       const result = await sequelize.transaction(async (t) => {
+   //          const user = await UserService.findUserById(userId);
+   //          if (!user) {
+   //             throw ApiError.notFound('Пользователь не найден');
+   //          }
+
+   //          const updateData = {};
+   //          let message = '';
+
+   //          // ✅ ПРИОРИТЕТ 1: Если передана роль (включая 'skipped')
+   //          if (role) {
+   //             updateData.role = role;
+   //             if (role === 'skipped') {
+   //                message = 'Onboarding пропущен';
+   //                console.log('🟢 Onboarding пропущен, устанавливаем role="skipped"');
+   //             } else {
+   //                message = 'Данные onboarding успешно обновлены';
+   //                console.log(`🟢 Onboarding завершен, роль установлена: ${role}`);
+   //             }
+   //          }
+   //          // ✅ ПРИОРИТЕТ 2: Если передано skipped: true (для обратной совместимости)
+   //          else if (isSkipping) {
+   //             updateData.role = 'skipped';
+   //             message = 'Onboarding пропущен';
+   //             console.log('🟢 Onboarding пропущен через skipped:true');
+   //          }
+
+   //          // Добавляем дополнительные данные, если переданы
+   //          if (training_level) updateData.training_level = training_level;
+   //          if (sport_specialization) updateData.sport_specialization = sport_specialization;
+   //          if (userName !== undefined) updateData.userName = userName;
+   //          if (birthDate !== undefined) updateData.birthDate = birthDate;
+   //          if (allow_connections !== undefined) updateData.allow_connections = allow_connections;
+
+   //          console.log('🟡 updateOnboarding - updateData для сохранения:', updateData);
+
+   //          // Обновляем пользователя
+   //          const updatedUser = await UserService.updateUser(updateData, userId, t);
+
+   //          console.log('🟡 updateOnboarding - результат updateUser:');
+   //          console.log('userName:', updatedUser.userName);
+   //          console.log('birthDate:', updatedUser.birthDate);
+   //          console.log('allow_connections:', updatedUser.allow_connections);
+   //          console.log('Полный объект:', JSON.stringify(updatedUser, null, 2));
+
+   //          return {
+   //             id: updatedUser.id,
+   //             email: updatedUser.email,
+   //             role: updatedUser.role,
+   //             userName: updatedUser.userName,
+   //             birthDate: updatedUser.birthDate,  // ✅ ДОБАВЬ В ОТВЕТ
+   //             allow_connections: updatedUser.allow_connections,  // ✅ ДОБАВЬ В ОТВЕТ
+   //             training_level: updatedUser.training_level,
+   //             sport_specialization: updatedUser.sport_specialization,
+   //             message: message,
+   //             skipped: updatedUser.role === 'skipped'
+   //          };
+   //       });
+
+   //       return res.json(result);
+   //    } catch (error) {
+   //       console.error('🔴 Error in updateOnboarding:', error);
+   //       return next(ApiError.internal('Ошибка при обновлении данных onboarding'));
+   //    }
+   // }
+
    async updateOnboarding(req, res, next) {
       try {
          console.log('=====================================');
          console.log('🟡 updateOnboarding - ПОЛНЫЙ req.body:', JSON.stringify(req.body, null, 2));
          console.log('=====================================');
 
-         // ✅ ДОБАВЬ ВСЕ ПОЛЯ В ДЕСТРУКТУРИЗАЦИЮ!
          const {
             role,
             training_level,
             sport_specialization,
             skipped,
-            userName,           // ✅ ДОБАВЬ
-            birthDate,          // ✅ ДОБАВЬ
-            allow_connections   // ✅ ДОБАВЬ
+            userName,
+            birthDate,
+            allow_connections
          } = req.body;
 
          const userId = req.user.id;
@@ -271,12 +448,11 @@ class UserController {
             training_level,
             sport_specialization,
             skipped,
-            userName,           // Теперь будет определено
-            birthDate,          // Теперь будет определено
-            allow_connections   // Теперь будет определено
+            userName,
+            birthDate,
+            allow_connections
          });
 
-         // ✅ УПРОЩЕННАЯ ВАЛИДАЦИЯ - разрешаем 'skipped' как роль
          const isSkipping = skipped === true;
          const hasValidRole = role && ['trainee', 'trainer', 'skipped'].includes(role);
          const hasTrainingData = training_level || sport_specialization;
@@ -286,6 +462,10 @@ class UserController {
          }
 
          const result = await sequelize.transaction(async (t) => {
+            // Получаем старого пользователя для сравнения роли
+            const oldUser = await UserService.findUserById(userId);
+            const oldRole = oldUser?.role;
+
             const user = await UserService.findUserById(userId);
             if (!user) {
                throw ApiError.notFound('Пользователь не найден');
@@ -294,7 +474,6 @@ class UserController {
             const updateData = {};
             let message = '';
 
-            // ✅ ПРИОРИТЕТ 1: Если передана роль (включая 'skipped')
             if (role) {
                updateData.role = role;
                if (role === 'skipped') {
@@ -305,14 +484,12 @@ class UserController {
                   console.log(`🟢 Onboarding завершен, роль установлена: ${role}`);
                }
             }
-            // ✅ ПРИОРИТЕТ 2: Если передано skipped: true (для обратной совместимости)
             else if (isSkipping) {
                updateData.role = 'skipped';
                message = 'Onboarding пропущен';
                console.log('🟢 Onboarding пропущен через skipped:true');
             }
 
-            // Добавляем дополнительные данные, если переданы
             if (training_level) updateData.training_level = training_level;
             if (sport_specialization) updateData.sport_specialization = sport_specialization;
             if (userName !== undefined) updateData.userName = userName;
@@ -321,22 +498,60 @@ class UserController {
 
             console.log('🟡 updateOnboarding - updateData для сохранения:', updateData);
 
-            // Обновляем пользователя
             const updatedUser = await UserService.updateUser(updateData, userId, t);
 
-            console.log('🟡 updateOnboarding - результат updateUser:');
-            console.log('userName:', updatedUser.userName);
-            console.log('birthDate:', updatedUser.birthDate);
-            console.log('allow_connections:', updatedUser.allow_connections);
-            console.log('Полный объект:', JSON.stringify(updatedUser, null, 2));
+            // Проверяем, изменилась ли роль
+            const newRole = updatedUser.role;
+
+            console.log('🟡 updateOnboarding - старая роль:', oldRole, 'новая роль:', newRole);
+
+            // Если роль изменилась - перевыпускаем токены!
+            if (oldRole !== newRole) {
+               console.log('🟢 Онбординг изменил роль, перевыпускаем токены');
+
+               // Генерируем новые токены с актуальной ролью
+               const accessToken = generateAccessToken(updatedUser.id, updatedUser.email, updatedUser.role);
+               const refreshToken = generateRefreshToken(updatedUser.id, updatedUser.email, updatedUser.role);
+
+               // Удаляем старый refresh токен из БД
+               const oldRefreshToken = req.cookies.refreshToken;
+               if (oldRefreshToken) {
+                  await RefreshTokenService.deleteOneToken(oldRefreshToken, t);
+               }
+
+               // Сохраняем новый refresh токен в БД
+               const decodedRefresh = jwt.decode(refreshToken);
+               await RefreshTokenService.createToken({
+                  token: refreshToken,
+                  userId: updatedUser.id,
+                  expiresAt: new Date(decodedRefresh.exp * 1000),
+               }, t);
+
+               // Устанавливаем новые токены в cookies (внутри транзакции)
+               res.cookie('accessToken', accessToken, {
+                  httpOnly: true,
+                  secure: process.env.NODE_ENV === 'production',
+                  sameSite: 'Strict',
+                  maxAge: 60 * 60 * 1000,
+               });
+
+               res.cookie('refreshToken', refreshToken, {
+                  httpOnly: true,
+                  secure: process.env.NODE_ENV === 'production',
+                  sameSite: 'Strict',
+                  maxAge: 30 * 24 * 60 * 60 * 1000,
+               });
+
+               console.log('✅ Новые токены установлены с ролью:', updatedUser.role);
+            }
 
             return {
                id: updatedUser.id,
                email: updatedUser.email,
                role: updatedUser.role,
                userName: updatedUser.userName,
-               birthDate: updatedUser.birthDate,  // ✅ ДОБАВЬ В ОТВЕТ
-               allow_connections: updatedUser.allow_connections,  // ✅ ДОБАВЬ В ОТВЕТ
+               birthDate: updatedUser.birthDate,
+               allow_connections: updatedUser.allow_connections,
                training_level: updatedUser.training_level,
                sport_specialization: updatedUser.sport_specialization,
                message: message,

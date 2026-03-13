@@ -1,5 +1,5 @@
 // backend/repository/mediaRepository.js
-const { Media, User } = require('../models/models');
+const { Media, User } = require('../models/legacy_models');
 
 class MediaRepository {
    async create(mediaData) {

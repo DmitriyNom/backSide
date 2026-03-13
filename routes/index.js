@@ -11,6 +11,10 @@ const routes = [
    { path: '/noteGroup', router: require('./noteGroupRouter') },
    { path: '/exerciseGroup', router: require('./exerciseGroupRouter') },
    { path: '/media', router: require('./mediaRouter') },
+   { path: '/connections', router: require('./connectionRouter') },
+   { path: '/groups', router: require('./groupRouter') },
+
+
    // УДАЛЕНО: { path: '/files', router: require('./fileUploadRouter') },
 
    // { path: '/userNote', router: require('./userNoteRouter') },

@@ -46,18 +46,76 @@ const User = sequelize.define('user', {
 
 // Добавляем новые ассоциации
 const ConnectionRequest = sequelize.define('connection_request', {
-   // определение модели...
+   id: {
+      type: DataTypes.INTEGER,
+      primaryKey: true,
+      autoIncrement: true
+   },
+   sender_id: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      references: {
+         model: User,
+         key: 'id'
+      }
+   },
+   receiver_id: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      references: {
+         model: User,
+         key: 'id'
+      }
+   },
+   sender_role: {
+      type: DataTypes.ENUM('trainer', 'trainee'),
+      allowNull: false,
+      comment: 'Роль отправителя на момент создания запроса'
+   },
+   status: {
+      type: DataTypes.ENUM('pending', 'accepted', 'rejected', 'cancelled'), // убрал 'blocked'
+      defaultValue: 'pending'
+   },
+   message: {
+      type: DataTypes.TEXT,
+      allowNull: true
+   }
+}, {
+   tableName: 'connection_requests',
+   underscored: true,
+   timestamps: true,
+   createdAt: 'created_at', // приведите к единому стилю
+   updatedAt: 'updated_at'
 });
 
 User.hasMany(ConnectionRequest, {
-   foreignKey: 'trainee_id',
-   as: 'sentConnectionRequests'
+   foreignKey: 'sender_id',
+   as: 'sentRequests' // исходящие запросы
 });
 
 User.hasMany(ConnectionRequest, {
-   foreignKey: 'trainer_id',
-   as: 'receivedConnectionRequests'
+   foreignKey: 'receiver_id',
+   as: 'receivedRequests' // входящие запросы
 });
+
+ConnectionRequest.belongsTo(User, {
+   foreignKey: 'sender_id',
+   as: 'sender'
+});
+
+ConnectionRequest.belongsTo(User, {
+   foreignKey: 'receiver_id',
+   as: 'receiver'
+});
+
+// Дополнительная ассоциация для быстрого доступа к роли отправителя
+// (не обязательная, но удобная)
+ConnectionRequest.belongsTo(User, {
+   foreignKey: 'sender_id',
+   as: 'senderUser'
+});
+
+
 
 //-------------------------------------------------------------------------------------------------------------------------
 
@@ -144,6 +202,32 @@ const NoteGroup = sequelize.define('noteGroup', {
    }
 });
 
+// const Note = sequelize.define("note", {
+//    id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+//    user_id: {
+//       type: DataTypes.INTEGER,
+//       allowNull: false,
+//       references: {
+//          model: User,
+//          key: 'id'
+//       }
+//    },
+//    note_group_id: {
+//       type: DataTypes.INTEGER,
+//       allowNull: true,
+//       references: {
+//          model: NoteGroup,
+//          key: 'id'
+//       }
+//    },
+//    note_name: { type: DataTypes.STRING },
+//    note_description: { type: DataTypes.STRING, defaultValue: "A note without description" },
+//    note_priority: { type: DataTypes.INTEGER, defaultValue: 1 },
+//    note_expiration_date: { type: DataTypes.DATE, defaultValue: null },
+//    note_is_completed: { type: DataTypes.BOOLEAN, defaultValue: false },
+//    note_mark: { type: DataTypes.STRING }
+// });
+
 const Note = sequelize.define("note", {
    id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
    user_id: {
@@ -167,10 +251,86 @@ const Note = sequelize.define("note", {
    note_priority: { type: DataTypes.INTEGER, defaultValue: 1 },
    note_expiration_date: { type: DataTypes.DATE, defaultValue: null },
    note_is_completed: { type: DataTypes.BOOLEAN, defaultValue: false },
-   note_mark: { type: DataTypes.STRING }
+   note_mark: { type: DataTypes.STRING },
+
+   // НОВЫЕ ПОЛЯ ДЛЯ РАСШИРЕНИЯ:
+   note_type: {
+      type: DataTypes.ENUM('personal_note', 'self_assignment', 'trainer_assignment'),
+      defaultValue: 'personal_note'
+   },
+   assigned_to_user_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      references: {
+         model: User,
+         key: 'id'
+      }
+   },
+   assigned_by_user_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      references: {
+         model: User,
+         key: 'id'
+      }
+   },
+   planned_date: {
+      type: DataTypes.DATEONLY,
+      allowNull: true
+   },
+   planned_time: {
+      type: DataTypes.TIME,
+      allowNull: true
+   },
+   duration_minutes: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      validate: {
+         min: 1
+      }
+   },
+   status: {
+      type: DataTypes.ENUM('draft', 'active', 'in_progress', 'submitted', 'reviewed', 'completed', 'overdue'),
+      defaultValue: 'active'
+   },
+   difficulty_rating: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      validate: {
+         min: 1,
+         max: 5
+      }
+   },
+   // Дополнительные поля для отчетов:
+   submitted_at: {
+      type: DataTypes.DATE,
+      allowNull: true
+   },
+   reviewed_at: {
+      type: DataTypes.DATE,
+      allowNull: true
+   },
+   review_comment: {
+      type: DataTypes.TEXT,
+      allowNull: true
+   },
+   review_rating: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      validate: {
+         min: 1,
+         max: 5
+      }
+   },
+   // JSON для дополнительных данных
+   metadata: {
+      type: DataTypes.JSONB,
+      defaultValue: {}
+   }
 });
 
 // ==================== MEDIA MODEL ====================
+
 const Media = sequelize.define('media', {
    id: {
       type: DataTypes.UUID,
@@ -316,6 +476,44 @@ const MediaAccessGrant = sequelize.define('media_access_grant', {
    updatedAt: 'updated_at'
 });
 
+
+
+// Таблица для подтвержденных связей
+const UserConnection = sequelize.define('user_connection', {
+   trainer_id: {
+      type: DataTypes.INTEGER,
+      primaryKey: true,
+      references: { model: User, key: 'id' }
+   },
+   trainee_id: {
+      type: DataTypes.INTEGER,
+      primaryKey: true,
+      references: { model: User, key: 'id' }
+   },
+   connected_at: {
+      type: DataTypes.DATE,
+      defaultValue: DataTypes.NOW
+   }
+}, {
+   tableName: 'user_connections',
+   timestamps: false
+});
+
+// Связи для User (добавить в существующие ассоциации):
+User.belongsToMany(User, {
+   through: UserConnection,
+   as: 'trainers',
+   foreignKey: 'trainee_id',
+   otherKey: 'trainer_id'
+});
+
+User.belongsToMany(User, {
+   through: UserConnection,
+   as: 'trainees',
+   foreignKey: 'trainer_id',
+   otherKey: 'trainee_id'
+});
+
 // Ассоциации для Media
 User.hasMany(Media, {
    foreignKey: 'user_id',
@@ -366,6 +564,37 @@ Note.belongsToMany(Media, {
    foreignKey: 'note_id',
    otherKey: 'media_id',
    as: 'media'
+});
+
+// После существующих ассоциаций добавляем:
+
+// Связь: кто назначил задание
+Note.belongsTo(User, {
+   foreignKey: 'assigned_by_user_id',
+   as: 'assignedBy'
+});
+
+// Связь: кому назначено задание
+Note.belongsTo(User, {
+   foreignKey: 'assigned_to_user_id',
+   as: 'assignedTo'
+});
+
+// Обновляем существующую связь для ясности:
+Note.belongsTo(User, {
+   foreignKey: 'user_id',
+   as: 'owner'
+});
+
+// Для User добавляем:
+User.hasMany(Note, {
+   foreignKey: 'assigned_to_user_id',
+   as: 'assignedTasks'
+});
+
+User.hasMany(Note, {
+   foreignKey: 'assigned_by_user_id',
+   as: 'createdTasksForOthers'
 });
 
 User.hasMany(Exercise, {
@@ -452,6 +681,10 @@ MediaAccessGrant.belongsTo(User, {
    as: 'grantee'
 });
 
+
+
+
+
 module.exports = {
    User,
    Exercise,
@@ -461,5 +694,6 @@ module.exports = {
    RefreshToken,
    Media,
    ConnectionRequest,
-   MediaAccessGrant
+   MediaAccessGrant,
+   UserConnection
 }

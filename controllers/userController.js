@@ -43,6 +43,50 @@ class UserController {
       }
    }
 
+   /**
+ * Поиск пользователей
+ * @param {Object} req - запрос
+ * @param {Object} res - ответ
+ * @param {Function} next - next middleware
+ */
+   async searchUsers(req, res, next) {
+      try {
+         const userId = req.user.id; // ID текущего пользователя
+         const { query, role = 'all', limit = 20, offset = 0 } = req.query;
+
+         console.log(`🟡 UserController.searchUsers: query="${query}", role=${role}, userId=${userId}`);
+
+         // Валидация запроса
+         if (!query || query.trim().length < 2) {
+            return res.json({
+               success: true,
+               count: 0,
+               data: []
+            });
+         }
+
+         // Поиск пользователей через сервис
+         const users = await UserService.searchUsers({
+            query: query.trim(),
+            role: role !== 'all' ? role : null,
+            excludeUserId: userId,
+            limit: parseInt(limit),
+            offset: parseInt(offset)
+         });
+
+         console.log(`✅ UserController.searchUsers: найдено ${users.length} пользователей`);
+
+         return res.json({
+            success: true,
+            count: users.length,
+            data: users
+         });
+      } catch (e) {
+         console.error('🔴 Error in searchUsers:', e);
+         next(e);
+      }
+   }
+
    async registration(req, res, next) {
       const { email, password, role, userName } = req.body;
       if (!email || !password) {

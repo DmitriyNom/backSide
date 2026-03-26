@@ -13,6 +13,8 @@ const routes = [
    { path: '/media', router: require('./mediaRouter') },
    { path: '/connections', router: require('./connectionRouter') },
    { path: '/groups', router: require('./groupRouter') },
+   { path: '/friends', router: require('./friendRouter') },
+   { path: '/contexts', router: require('./trainingContextRouter') },
 
 
    // УДАЛЕНО: { path: '/files', router: require('./fileUploadRouter') },
@@ -31,9 +33,27 @@ const routes = [
    // { path: '/hydration', router: require('./hydrationRouter') },
 ];
 
+console.log('\n=== ЗАРЕГИСТРИРОВАННЫЕ РОУТЫ ===');
+routes.forEach(route => {
+   console.log(`✅ /api${route.path} -> ${route.path}Router`);
+});
+console.log('================================\n');
+
 // Маршрутизаторы
 routes.forEach(route => {
    router.use(route.path, route.router);
+});
+
+// Логируем все входящие запросы
+router.use((req, res, next) => {
+   console.log(`📡 Incoming request: ${req.method} ${req.originalUrl}`);
+   next();
+});
+
+// Обработка несуществующих маршрутов
+router.use((req, res, next) => {
+   console.log(`❌ 404 NOT FOUND: ${req.method} ${req.originalUrl}`);
+   return next(ApiError.notFound("Ресурс не найден"));
 });
 
 // Обработка несуществующих маршрутов

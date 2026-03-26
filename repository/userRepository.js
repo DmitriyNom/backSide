@@ -1,5 +1,6 @@
 // repositories/UserRepository.js
 const { User } = require('../models/legacy_models');
+const { Op } = require('sequelize'); // 👈 ДОБАВЛЕНО
 
 class UserRepository {
    async findUser(email) {
@@ -11,7 +12,7 @@ class UserRepository {
    }
 
    async findUserById(id) {
-      return await User.findOne({ where: { id } }); // ✅ ИСПРАВЛЕНО
+      return await User.findOne({ where: { id } });
    }
 
    async getAllUsers() {
@@ -41,6 +42,52 @@ class UserRepository {
 
    async deleteUser(id) {
       return await User.destroy({ where: { id } });
+   }
+
+   // 👇 НОВЫЙ МЕТОД
+   async searchUsers({ query, role = null, excludeUserId = null, limit = 20, offset = 0 }) {
+      console.log(`🟡 UserRepository.searchUsers: query="${query}", role=${role}, excludeUserId=${excludeUserId}`);
+
+      try {
+         const whereConditions = {
+            [Op.or]: [
+               { userName: { [Op.iLike]: `%${query}%` } },
+               { email: { [Op.iLike]: `%${query}%` } }
+            ]
+         };
+
+         if (role) {
+            whereConditions.role = role;
+         }
+
+         if (excludeUserId) {
+            whereConditions.id = { [Op.ne]: excludeUserId };
+         }
+
+         const users = await User.findAll({
+            where: whereConditions,
+            attributes: [
+               'id',
+               'userName',
+               'email',
+               'userAvatar',
+               'role',
+               'training_level',
+               'sport_specialization',
+               'birthDate',
+               'allow_connections'
+            ],
+            limit,
+            offset,
+            order: [['userName', 'ASC']]
+         });
+
+         console.log(`✅ UserRepository.searchUsers: найдено ${users.length} пользователей`);
+         return users;
+      } catch (error) {
+         console.error('🔴 Error in UserRepository.searchUsers:', error);
+         throw error;
+      }
    }
 }
 

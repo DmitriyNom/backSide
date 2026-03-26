@@ -12,6 +12,36 @@ class UserService {
       return await UserRepository.findUserById(id)
    }
 
+   /**
+ * Поиск пользователей по запросу
+ * @param {Object} params - параметры поиска
+ * @param {string} params.query - поисковый запрос
+ * @param {string|null} params.role - фильтр по роли (trainer/trainee/null)
+ * @param {number} params.excludeUserId - ID пользователя, которого нужно исключить (текущий пользователь)
+ * @param {number} params.limit - лимит результатов
+ * @param {number} params.offset - смещение
+ */
+   async searchUsers({ query, role = null, excludeUserId = null, limit = 20, offset = 0 }) {
+      console.log(`🟡 UserService.searchUsers: query="${query}", role=${role}, excludeUserId=${excludeUserId}`);
+
+      try {
+         // Вызываем метод репозитория
+         const users = await UserRepository.searchUsers({
+            query,
+            role,
+            excludeUserId,
+            limit,
+            offset
+         });
+
+         console.log(`✅ UserService.searchUsers: найдено ${users.length} пользователей`);
+         return users;
+      } catch (error) {
+         console.error('🔴 Error in UserService.searchUsers:', error);
+         throw error;
+      }
+   }
+
    async findUserByName(name) {
       return await UserRepository.findUserByName(name)
    }

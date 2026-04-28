@@ -2,7 +2,7 @@
 const { DataTypes } = require('sequelize');
 
 module.exports = (sequelize) => {
-   const ExerciseGroup = sequelize.define('exerciseGroup', {
+   const ExerciseGroup = sequelize.define('ExerciseGroup', {
       id: {
          type: DataTypes.INTEGER,
          primaryKey: true,

@@ -7,6 +7,7 @@ const ApiError = require('../error/ApiError');
 const routes = [
    { path: '/user', router: require('./userRouter') },
    { path: '/exercise', router: require('./exerciseRouter') },
+   { path: '/tags', router: require('./tagRouter') },
    { path: '/notes', router: require('./noteRouter') },
    { path: '/noteGroup', router: require('./noteGroupRouter') },
    { path: '/exerciseGroup', router: require('./exerciseGroupRouter') },
@@ -15,6 +16,7 @@ const routes = [
    { path: '/groups', router: require('./groupRouter') },
    { path: '/friends', router: require('./friendRouter') },
    { path: '/contexts', router: require('./trainingContextRouter') },
+   { path: '/tasks', router: require('./taskRouter') },
 
 
    // УДАЛЕНО: { path: '/files', router: require('./fileUploadRouter') },

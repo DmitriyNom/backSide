@@ -2,7 +2,7 @@
 const { DataTypes } = require('sequelize');
 
 module.exports = (sequelize) => {
-   const User = sequelize.define('user', {
+   const User = sequelize.define('User', {
       id: {
          type: DataTypes.INTEGER,
          primaryKey: true,
@@ -11,12 +11,17 @@ module.exports = (sequelize) => {
       userName: {
          type: DataTypes.STRING,
          unique: true,
-         field: 'userName' // Явно указываем имя поля в БД
+         field: 'userName'  // поле в БД называется userName
       },
-      birthDate: {
-         type: DataTypes.DATE,
+      firstName: {
+         type: DataTypes.STRING,
          allowNull: true,
-         field: 'birthDate'
+         field: 'firstName'
+      },
+      lastName: {
+         type: DataTypes.STRING,
+         allowNull: true,
+         field: 'lastName'
       },
       email: {
          type: DataTypes.STRING,
@@ -42,27 +47,62 @@ module.exports = (sequelize) => {
          allowNull: true,
          field: 'userAvatar'
       },
+      birthDate: {
+         type: DataTypes.DATE,
+         allowNull: true,
+         field: 'birthDate'
+      },
       sport_specialization: {
          type: DataTypes.STRING(100),
          allowNull: true,
-         field: 'sport_specialization'
+         field: 'sport_specialization'  // snake_case в БД
       },
       training_level: {
          type: DataTypes.ENUM('beginner', 'amateur', 'advanced', 'professional'),
          allowNull: true,
-         field: 'training_level'
+         field: 'training_level'  // snake_case в БД
       },
       allow_connections: {
          type: DataTypes.BOOLEAN,
          defaultValue: true,
-         field: 'allow_connections'
+         field: 'allow_connections'  // snake_case в БД
+      },
+      height: {
+         type: DataTypes.INTEGER,
+         allowNull: true,
+         field: 'height'
+      },
+      weight: {
+         type: DataTypes.INTEGER,
+         allowNull: true,
+         field: 'weight'
+      },
+      position: {
+         type: DataTypes.STRING,
+         allowNull: true,
+         field: 'position'
+      },
+      country: {
+         type: DataTypes.STRING,
+         allowNull: true,
+         field: 'country'
+      },
+      city: {
+         type: DataTypes.STRING,
+         allowNull: true,
+         field: 'city'
+      },
+      teamName: {
+         type: DataTypes.STRING,
+         allowNull: true,
+         field: 'teamName'
       }
    }, {
       tableName: 'users',
-      underscored: true, // Оставляем true для полей типа sport_specialization
+      underscored: false,  // 👈 Отключаем автоматическое преобразование в snake_case
       timestamps: true,
-      createdAt: 'createdAt', // Исправляем: в БД createdAt, а не created_at
-      updatedAt: 'updatedAt'  // Исправляем: в БД updatedAt, а не updated_at
+      createdAt: 'createdAt',  // поле в БД называется createdAt
+      updatedAt: 'updatedAt'   // поле в БД называется updatedAt
    });
 
    return User;

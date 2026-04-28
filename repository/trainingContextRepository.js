@@ -191,6 +191,37 @@ class TrainingContextRepository {
          return { total: 0, as_trainer: 0, as_trainee: 0 };
       }
    }
+
+   // repositories/trainingContextRepository.js
+
+   /**
+    * Получить контексты по ID дружбы (алиас для getByFriendId)
+    * @param {number} friendshipId - ID из таблицы friends
+    * @param {Object} options - { status }
+    */
+   // repositories/trainingContextRepository.js
+
+   async getContextsByFriendId(friendshipId, options = {}) {
+      try {
+         const where = { friend_id: friendshipId };
+         if (options.status) {
+            where.status = options.status;
+         }
+
+         const contexts = await TrainingContext.findAll({
+            where,
+            include: [
+               { model: User, as: 'trainer', attributes: ['id', 'userName', 'userAvatar'] },
+               { model: User, as: 'trainee', attributes: ['id', 'userName', 'userAvatar'] }
+            ]
+         });
+
+         return contexts;
+      } catch (error) {
+         console.error('Error in TrainingContextRepository.getContextsByFriendId:', error);
+         return [];
+      }
+   }
 }
 
 module.exports = new TrainingContextRepository();

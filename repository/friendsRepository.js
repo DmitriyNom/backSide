@@ -6,7 +6,7 @@ class FriendRepository {
    constructor() {
       // Получаем модели из db с правильными именами
       this.Friend = db.friend;      // из лога: friend: ✅
-      this.User = db.user;          // из лога: user: ✅
+      this.User = db.User;          // из лога: user: ✅
       this.ConnectionRequest = db.connection_request; // из лога: connection_request: ✅
 
       console.log('✅ FriendRepository initialized with:', {

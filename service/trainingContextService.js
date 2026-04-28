@@ -20,29 +20,30 @@ class TrainingContextService {
 
       const { sport, trainer_id, trainee_id } = contextData;
 
-      // 1. Проверяем существование пользователей
-      const [user, friend] = await Promise.all([
-         UserRepository.findUserById(userId),
-         UserRepository.findUserById(friendId)
-      ]);
-
-      if (!user || !friend) {
-         throw ApiError.notFound('Пользователь не найден');
-      }
-
-      // 2. Проверяем, что пользователи - друзья
-      const friendship = await FriendRepository.findFriendship(userId, friendId, 'accepted');
+      // 1. Получаем запись о дружбе
+      const friendship = await FriendRepository.getFriendRequestById(friendId);
       if (!friendship) {
-         throw ApiError.forbidden('Контекст тренировки можно создать только с другом');
+         throw ApiError.notFound('Дружба не найдена');
       }
 
-      // 3. Валидация trainer_id и trainee_id
+      // 2. Проверяем, что текущий пользователь участвует в дружбе
+      if (friendship.user_id !== userId && friendship.friend_id !== userId) {
+         throw ApiError.forbidden('Вы не участвуете в этой дружбе');
+      }
+
+      // 3. Проверяем статус дружбы
+      if (friendship.status !== 'accepted') {
+         throw ApiError.forbidden('Контекст можно создать только с подтверждённым другом');
+      }
+
+      // 4. Валидация trainer_id и trainee_id
       if (!trainer_id || !trainee_id) {
          throw ApiError.badRequest('Необходимо указать trainer_id и trainee_id');
       }
 
-      // 4. Проверяем, что trainer и trainee - это именно те пользователи
-      if (![userId, friendId].includes(trainer_id) || ![userId, friendId].includes(trainee_id)) {
+      // 5. Проверяем, что trainer и trainee - это именно участники дружбы
+      const participants = [friendship.user_id, friendship.friend_id];
+      if (!participants.includes(trainer_id) || !participants.includes(trainee_id)) {
          throw ApiError.badRequest('Тренер и ученик должны быть участниками дружбы');
       }
 
@@ -50,13 +51,13 @@ class TrainingContextService {
          throw ApiError.badRequest('Тренер и ученик не могут быть одним лицом');
       }
 
-      // 5. Проверяем существование активного контекста для этого спорта
+      // 6. Проверяем существование активного контекста для этого спорта
       const exists = await TrainingContextRepository.exists(friendship.id, sport);
       if (exists) {
          throw ApiError.badRequest(`Контекст тренировки для спорта "${sport}" уже существует`);
       }
 
-      // 6. Создаем контекст
+      // 7. Создаём контекст
       const context = await TrainingContextRepository.create({
          friend_id: friendship.id,
          sport,
@@ -68,7 +69,6 @@ class TrainingContextService {
 
       console.log(`✅ TrainingContextService.createContext: контекст создан, ID: ${context.id}`);
 
-      // Возвращаем с полными данными
       return await TrainingContextRepository.findById(context.id);
    }
 

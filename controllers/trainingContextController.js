@@ -11,6 +11,10 @@ class TrainingContextController {
     * Создать контекст тренировки с другом
     * POST /api/friends/:friendId/contexts
     */
+   /**
+   * Создать контекст тренировки с другом
+   * POST /api/friends/:friendId/contexts
+   */
    async createContext(req, res, next) {
       try {
          const userId = req.user.id;
@@ -30,16 +34,30 @@ class TrainingContextController {
             throw ApiError.badRequest('Необходимо указать trainer_id и trainee_id');
          }
 
-         // Проверяем, что друг существует
-         const friend = await UserRepository.findUserById(friendId);
-         if (!friend) {
-            throw ApiError.notFound('Друг не найден');
+         // Получаем запись о дружбе по ID
+         const friendship = await FriendRepository.getFriendRequestById(parseInt(friendId));
+         if (!friendship) {
+            throw ApiError.notFound('Дружба не найдена');
          }
 
-         // Проверяем, что пользователи действительно друзья
-         const friendship = await FriendRepository.findFriendship(userId, parseInt(friendId), 'accepted');
-         if (!friendship) {
-            throw ApiError.forbidden('Контекст тренировки можно создать только с другом');
+         // Проверяем, что текущий пользователь участвует в этой дружбе
+         if (friendship.user_id !== userId && friendship.friend_id !== userId) {
+            throw ApiError.forbidden('Вы не являетесь участником этой дружбы');
+         }
+
+         // Проверяем, что статус дружбы accepted
+         if (friendship.status !== 'accepted') {
+            throw ApiError.forbidden('Контекст тренировки можно создать только с подтвержденным другом');
+         }
+
+         // Проверяем, что trainer_id и trainee_id соответствуют участникам дружбы
+         const validUsers = [friendship.user_id, friendship.friend_id];
+         if (!validUsers.includes(trainer_id) || !validUsers.includes(trainee_id)) {
+            throw ApiError.badRequest('trainer_id и trainee_id должны быть участниками дружбы');
+         }
+
+         if (trainer_id === trainee_id) {
+            throw ApiError.badRequest('Тренер и ученик не могут быть одним и тем же лицом');
          }
 
          const context = await TrainingContextService.createContext(

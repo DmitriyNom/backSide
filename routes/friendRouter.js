@@ -40,4 +40,7 @@ router.post('/:userId/block', FriendController.blockUser);
 router.delete('/:userId/block', FriendController.unblockUser);
 router.get('/blocked', FriendController.getBlockedUsers);
 
+// ============ ДРУЗЬЯ ПОЛЬЗОВАТЕЛЯ (для просмотра) ============
+router.get('/user/:userId', FriendController.getUserFriends);
+
 module.exports = router;

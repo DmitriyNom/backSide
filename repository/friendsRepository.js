@@ -446,6 +446,23 @@ class FriendRepository {
          return [];
       }
    }
+
+   /**
+ * Удалить запрос/запись о дружбе по ID
+ * @param {number} requestId - ID записи
+ */
+   async deleteRequest(requestId) {
+      try {
+         const deleted = await this.Friend.destroy({
+            where: { id: requestId }
+         });
+         console.log(`🗑️ Удалена запись ${requestId}, успешно: ${deleted > 0}`);
+         return deleted > 0;
+      } catch (error) {
+         console.error('Error in deleteRequest:', error);
+         throw error;
+      }
+   }
 }
 
 module.exports = new FriendRepository();

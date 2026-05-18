@@ -316,9 +316,6 @@ function setupAssociations(db) {
       MediaAccessGrant.belongsTo(User, { foreignKey: 'grantor_id', as: 'grantor' });
       MediaAccessGrant.belongsTo(User, { foreignKey: 'grantee_id', as: 'grantee' });
 
-
-
-
       // ==================== СВЯЗИ ДЛЯ FRIEND ====================
       if (Friend) {
          console.log('🟢 Устанавливаем ассоциации для Friend');
@@ -423,6 +420,24 @@ function setupAssociations(db) {
          console.log('✅ TaskMedia associations added');
       } else {
          console.log('⚠ Task, TaskMedia или Media не загружены для ассоциаций');
+      }
+
+      // ==================== НОВЫЕ СВЯЗИ ДЛЯ TASK ↔ TRAINING_CONTEXT ====================
+      if (Task && TrainingContext) {
+         // Задание принадлежит контексту тренировки
+         Task.belongsTo(TrainingContext, {
+            foreignKey: 'context_id',
+            as: 'training_context'
+         });
+
+         // У контекста тренировки может быть много заданий
+         TrainingContext.hasMany(Task, {
+            foreignKey: 'context_id',
+            as: 'tasks'
+         });
+         console.log('✅ Task ↔ TrainingContext associations added');
+      } else {
+         console.log('⚠ Task или TrainingContext не загружены для связи');
       }
 
       console.log('\n✅ Все ассоциации успешно установлены');

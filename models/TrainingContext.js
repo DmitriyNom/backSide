@@ -56,5 +56,32 @@ module.exports = (sequelize) => {
       updatedAt: 'updated_at'
    });
 
+   // ✅ АССОЦИАЦИИ (добавляем этот блок)
+   TrainingContext.associate = function (models) {
+      // Связь с User как тренер
+      TrainingContext.belongsTo(models.User, {
+         foreignKey: 'trainer_id',
+         as: 'trainer'
+      });
+
+      // Связь с User как ученик
+      TrainingContext.belongsTo(models.User, {
+         foreignKey: 'trainee_id',
+         as: 'trainee'
+      });
+
+      // Связь с Friend
+      TrainingContext.belongsTo(models.Friend, {
+         foreignKey: 'friend_id',
+         as: 'friendship'
+      });
+
+      // Связь с Task (один ко многим)
+      TrainingContext.hasMany(models.Task, {
+         foreignKey: 'context_id',
+         as: 'tasks'
+      });
+   };
+
    return TrainingContext;
 };

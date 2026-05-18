@@ -484,6 +484,51 @@ class FriendController {
          next(e);
       }
    }
+
+   /**
+ * Получить друзей пользователя по ID
+ * GET /api/friends/user/:userId
+ */
+   async getUserFriends(req, res, next) {
+      try {
+         const { userId } = req.params;
+         const { limit = 50, offset = 0, search } = req.query;
+
+         if (!userId) {
+            throw ApiError.badRequest('Не указан пользователь');
+         }
+
+         // Проверяем, что пользователь существует
+         const user = await UserRepository.findUserById(parseInt(userId));
+         if (!user) {
+            throw ApiError.notFound('Пользователь не найден');
+         }
+
+         const friends = await FriendService.getUserFriends(
+            parseInt(userId),
+            {
+               limit: parseInt(limit),
+               offset: parseInt(offset),
+               search
+            }
+         );
+
+         // Обогащаем статусом дружбы с текущим пользователем (опционально)
+         const currentUserId = req.user.id;
+         const enrichedFriends = await FriendService.enrichUsersWithFriendStatus(
+            friends,
+            currentUserId
+         );
+
+         return res.json({
+            success: true,
+            count: friends.length,
+            data: enrichedFriends
+         });
+      } catch (e) {
+         next(e);
+      }
+   }
 }
 
 module.exports = new FriendController();

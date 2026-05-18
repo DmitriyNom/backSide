@@ -1,7 +1,13 @@
 // service/taskService.js
-const { Task, Exercise, User, Media, Note, ExerciseMedia, TrainingContext, Friend, sequelize } = require('../models');
-const TaskRepository = require('../repository/taskRepository');
+const { Task, Exercise, User, Media, ExerciseMedia, sequelize, friend: Friend, training_context: TrainingContext, note: Note } = require('../models');
 const ApiError = require('../error/ApiError');
+const { Op } = require('sequelize');
+const TrainingContextService = require('./trainingContextService');
+
+const TaskRepository = require('../repository/taskRepository');
+
+
+console.log('✅ TaskRepository loaded:', typeof TaskRepository?.create);
 
 class TaskService {
    // ========== ОСНОВНЫЕ МЕТОДЫ ==========
@@ -10,6 +16,9 @@ class TaskService {
     * Создать задание
     */
    async createTask(data, userId) {
+
+      console.log('🔍 1. TaskRepository.create exists:', typeof TaskRepository?.create);
+
       const transaction = await sequelize.transaction();
 
       try {
@@ -21,14 +30,7 @@ class TaskService {
             throw ApiError.notFound('Пользователь не найден');
          }
 
-         // 2. Проверка права на создание задания
-         const canAssign = await this.canAssignTask(userId, targetUserId);
-
-         if (!canAssign && userId !== targetUserId) {
-            throw ApiError.forbidden('У вас нет прав для создания заданий этому пользователю');
-         }
-
-         // 3. Если есть exercise_id — проверяем доступ к упражнению
+         // 2. Если есть exercise_id — проверяем доступ к упражнению
          if (data.exercise_id) {
             const hasAccess = await this.checkExerciseAccess(data.exercise_id, userId);
             if (!hasAccess) {
@@ -36,12 +38,12 @@ class TaskService {
             }
          }
 
-         // 4. Валидация: либо exercise_id, либо custom_title
+         // 3. Валидация: либо exercise_id, либо custom_title
          if (!data.exercise_id && !data.custom_title) {
             throw ApiError.badRequest('Укажите либо упражнение из библиотеки, либо название задания');
          }
 
-         // 5. Создаём задание
+         // Создаём taskData с базовыми полями
          const taskData = {
             exercise_id: data.exercise_id || null,
             user_id: targetUserId,
@@ -56,7 +58,50 @@ class TaskService {
             status: 'active'
          };
 
+         // 4. Если задание не себе — создаём или находим TrainingContext
+         if (userId !== targetUserId) {
+            const friendship = await Friend.findOne({
+               where: {
+                  [Op.or]: [
+                     { user_id: userId, friend_id: targetUserId },
+                     { user_id: targetUserId, friend_id: userId }
+                  ],
+                  status: 'accepted'
+               }
+            });
+
+            if (!friendship) {
+               throw ApiError.forbidden('Вы должны быть друзьями для создания заданий');
+            }
+
+            const sport = 'hockey';
+
+            let context = await TrainingContext.findOne({
+               where: {
+                  trainer_id: userId,
+                  trainee_id: targetUserId,
+                  sport: sport,
+                  status: 'active'
+               }
+            });
+
+            if (!context) {
+               context = await TrainingContextService.createContext(userId, friendship.id, {
+                  sport: sport,
+                  trainer_id: userId,
+                  trainee_id: targetUserId
+               });
+            }
+
+            taskData.context_id = context.id;
+         }
+
+         console.log('🔍 2. About to call TaskRepository.create with:', taskData);
+         // 5. Создаём задание
          const task = await TaskRepository.create(taskData, transaction);
+
+
+         console.log('🔍 3. Task created:', task?.id);
 
          // 6. Если есть медиа и задание кастомное — привязываем
          if (data.media_ids && data.media_ids.length > 0 && !data.exercise_id) {
@@ -99,17 +144,14 @@ class TaskService {
             throw ApiError.notFound('Задание не найдено');
          }
 
-         // Проверка: задание должно быть кастомным
          if (task.exercise_id) {
             throw ApiError.badRequest('Это задание уже привязано к упражнению');
          }
 
-         // Проверка прав: только создатель задания
          if (task.assigned_by_user_id !== userId) {
             throw ApiError.forbidden('Только создатель задания может сохранить его в библиотеку');
          }
 
-         // Создаём новое упражнение
          const exercise = await Exercise.create({
             user_id: userId,
             title: task.custom_title,
@@ -118,7 +160,6 @@ class TaskService {
             usage_count: 1
          }, { transaction });
 
-         // Копируем медиа из TaskMedia в ExerciseMedia
          const mediaList = await TaskRepository.getMedia(taskId, transaction);
          for (let i = 0; i < mediaList.length; i++) {
             const tm = mediaList[i];
@@ -129,14 +170,12 @@ class TaskService {
             }, { transaction });
          }
 
-         // Обновляем задание
          await TaskRepository.update(task.id, {
             exercise_id: exercise.id,
             custom_title: null,
             custom_description: null
          }, transaction);
 
-         // Удаляем временные связи TaskMedia
          const { TaskMedia } = require('../models');
          await TaskMedia.destroy({ where: { task_id: task.id }, transaction });
 
@@ -197,13 +236,11 @@ class TaskService {
             throw ApiError.badRequest('Задание уже выполнено');
          }
 
-         // Рассчитываем процент выполнения
          const completionPercentage = this.calculateCompletionPercentage(
             task.metrics,
             completionData.actual_metrics || {}
          );
 
-         // Рассчитываем начисленные баллы
          const pointsEarned = this.calculatePoints(
             task.points_earned || 0,
             completionPercentage,
@@ -211,7 +248,6 @@ class TaskService {
             task.due_date
          );
 
-         // Обновляем задание
          await TaskRepository.updateCompletionPercentage(
             id,
             completionPercentage,
@@ -226,7 +262,6 @@ class TaskService {
             await TaskRepository.update(id, { points_earned: pointsEarned }, transaction);
          }
 
-         // Обновляем Bridge-заметку
          const updatedTask = await TaskRepository.findById(id, transaction);
          await this.updateBridgeNoteForTask(updatedTask, transaction);
 
@@ -241,7 +276,7 @@ class TaskService {
    }
 
    /**
-    * Обновить задание (тренер/создатель)
+    * Обновить задание
     */
    async updateTask(id, updateData, userId, userRole) {
       const task = await TaskRepository.findById(id);
@@ -256,14 +291,11 @@ class TaskService {
          throw ApiError.forbidden('Только создатель задания может его редактировать');
       }
 
-      // Нельзя редактировать выполненное задание
       if (task.status === 'completed') {
          throw ApiError.badRequest('Нельзя редактировать выполненное задание');
       }
 
       const updatedTask = await TaskRepository.update(id, updateData);
-
-      // Обновляем Bridge-заметку
       await this.updateBridgeNoteForTask(updatedTask);
 
       return updatedTask;
@@ -285,9 +317,7 @@ class TaskService {
          throw ApiError.forbidden('Только создатель задания может его удалить');
       }
 
-      // Удаляем Bridge-заметку
       await this.deleteBridgeNoteForTask(task);
-
       return await TaskRepository.delete(id);
    }
 
@@ -318,68 +348,77 @@ class TaskService {
    async getAssignableUsers(userId) {
       const users = [];
 
-      // 1. Сам себя
-      const self = await User.findByPk(userId, {
-         attributes: ['id', 'userName', 'email', 'role']
-      });
-      if (self) {
-         users.push({
-            ...self.toJSON(),
-            relation_type: 'self',
-            relation_name: 'Себе'
+      try {
+         // 1. Сам себя
+         const self = await User.findByPk(userId, {
+            attributes: ['id', 'userName', 'email', 'role']
          });
-      }
+         if (self) {
+            users.push({
+               ...self.toJSON(),
+               relation_type: 'self',
+               relation_name: 'Себе'
+            });
+         }
 
-      // 2. Проверка на админа
-      const currentUser = await User.findByPk(userId, { attributes: ['role'] });
-      const isAdmin = currentUser?.role === 'admin';
-
-      if (isAdmin) {
-         const allUsers = await User.findAll({
-            attributes: ['id', 'userName', 'email', 'role'],
-            limit: 100
-         });
-         allUsers.forEach(u => {
-            if (u.id !== userId) {
-               users.push({
-                  ...u.toJSON(),
-                  relation_type: 'admin',
-                  relation_name: 'Все пользователи (Admin)'
-               });
+         // 2. Получаем всех друзей
+         const friendships = await Friend.findAll({
+            where: {
+               [Op.or]: [
+                  { user_id: userId, status: 'accepted' },
+                  { friend_id: userId, status: 'accepted' }
+               ]
             }
          });
+
+         // 3. Собираем ID друзей
+         const friendIds = [];
+         for (const friendship of friendships) {
+            let friendId;
+            if (friendship.user_id === userId) {
+               friendId = friendship.friend_id;
+            } else {
+               friendId = friendship.user_id;
+            }
+            friendIds.push(friendId);
+         }
+
+         // 4. Получаем пользователей по ID
+         if (friendIds.length > 0) {
+            const friends = await User.findAll({
+               where: { id: friendIds },
+               attributes: ['id', 'userName', 'email', 'role']
+            });
+
+            friends.forEach(friend => {
+               users.push({
+                  id: friend.id,
+                  userName: friend.userName,
+                  email: friend.email,
+                  role: friend.role,
+                  relation_type: 'friend',
+                  relation_name: 'Друг'
+               });
+            });
+         }
+
+         console.log('✅ getAssignableUsers returning:', users.length, 'users');
          return users;
+
+      } catch (error) {
+         console.error('❌ getAssignableUsers error:', error);
+         throw ApiError.internal('Ошибка получения списка пользователей');
       }
-
-      // 3. Тренируемые спортсмены (через TrainingContext)
-      const trainees = await TaskRepository.getTraineesByTrainer(userId);
-      trainees.forEach(t => {
-         users.push({
-            id: t.id,
-            userName: t.userName,
-            email: t.email,
-            role: t.role,
-            relation_type: 'trainee',
-            relation_name: `Подопечный (${t.sport})`,
-            context_id: t.context_id
-         });
-      });
-
-      return users;
    }
 
    // ========== МЕТОДЫ ДЛЯ РАБОТЫ С МЕДИА ==========
 
-   /**
-    * Добавить медиа к кастомному заданию
-    */
    async addMediaToTask(taskId, mediaId, userId, userRole) {
       const task = await TaskRepository.findById(taskId);
       if (!task) {
          throw ApiError.notFound('Задание не найдено');
       }
 
-      // Только создатель задания может добавлять медиа
       const isAssigner = task.assigned_by_user_id === userId;
       const isAdmin = userRole === 'admin';
 
@@ -387,12 +426,10 @@ class TaskService {
          throw ApiError.forbidden('Только создатель задания может добавлять медиа');
       }
 
-      // Только для кастомных заданий
       if (task.exercise_id) {
          throw ApiError.badRequest('Медиа можно добавлять только к кастомным заданиям');
       }
 
-      // Проверяем существование медиа
       const media = await Media.findByPk(mediaId);
       if (!media) {
          throw ApiError.notFound('Медиа не найдено');
@@ -404,9 +441,6 @@ class TaskService {
       return await TaskRepository.addMedia(taskId, mediaId, orderIndex);
    }
 
-   /**
-    * Удалить медиа из кастомного задания
-    */
    async removeMediaFromTask(taskId, mediaId, userId, userRole) {
       const task = await TaskRepository.findById(taskId);
       if (!task) {
@@ -427,9 +461,6 @@ class TaskService {
       return await TaskRepository.removeMedia(taskId, mediaId);
    }
 
-   /**
-    * Получить медиа задания
-    */
    async getTaskMedia(taskId, userId, userRole) {
       const task = await TaskRepository.findById(taskId);
       if (!task) {
@@ -451,17 +482,12 @@ class TaskService {
 
    /**
     * Проверка, может ли пользователь создавать задания для другого
+    * Упрощено: только себе можно без проверок
+    * Для других проверка дружбы выполняется в createTask
     */
    async canAssignTask(assignerId, targetUserId) {
-      // 1. Админ может всё
-      const assigner = await User.findByPk(assignerId, { attributes: ['role'] });
-      if (assigner?.role === 'admin') return true;
-
-      // 2. Сам себе может
-      if (assignerId === targetUserId) return true;
-
-      // 3. Проверка активного TrainingContext (как тренер)
-      return await TaskRepository.hasActiveTrainingContext(assignerId, targetUserId);
+      // Только себе можно создавать задания без дополнительных проверок
+      return assignerId === targetUserId;
    }
 
    /**
@@ -471,10 +497,8 @@ class TaskService {
       const exercise = await Exercise.findByPk(exerciseId);
       if (!exercise) return false;
 
-      // Своё упражнение или публичное
       if (exercise.user_id === userId || exercise.is_public) return true;
 
-      // Проверка доступа через ExerciseAccess
       const { ExerciseAccess } = require('../models');
       const access = await ExerciseAccess.findOne({
          where: {
@@ -489,9 +513,6 @@ class TaskService {
 
    // ========== РАСЧЁТ МЕТРИК ==========
 
-   /**
-    * Рассчитать процент выполнения
-    */
    calculateCompletionPercentage(plannedMetrics, actualMetrics) {
       if (!actualMetrics || Object.keys(actualMetrics).length === 0) return 0;
 
@@ -556,18 +577,13 @@ class TaskService {
       return Math.min(100, Math.round((actualIntervals / plannedIntervals) * 100));
    }
 
-   /**
-    * Рассчитать начисляемые баллы
-    */
    calculatePoints(basePoints, completionPercentage, feltDifficulty, dueDate) {
       let points = Math.round(basePoints * (completionPercentage / 100));
 
-      // Бонус за высокую сложность
       if (feltDifficulty && feltDifficulty >= 8) {
          points += Math.round(basePoints * 0.1);
       }
 
-      // Бонус за досрочное выполнение
       if (dueDate && new Date() < new Date(dueDate)) {
          points += Math.round(basePoints * 0.15);
       }
@@ -577,9 +593,6 @@ class TaskService {
 
    // ========== РАБОТА С BRIDGE-ЗАМЕТКАМИ ==========
 
-   /**
-    * Создать Bridge-заметку для задания
-    */
    async createBridgeNoteForTask(task, transaction = null) {
       const exercise = task.exercise_id
          ? await Exercise.findByPk(task.exercise_id, { transaction })
@@ -619,9 +632,6 @@ class TaskService {
       }, { transaction });
    }
 
-   /**
-    * Обновить Bridge-заметку
-    */
    async updateBridgeNoteForTask(task, transaction = null) {
       const note = await Note.findOne({
          where: { bridge_type: 'task', bridge_id: task.id },
@@ -644,9 +654,6 @@ class TaskService {
       }
    }
 
-   /**
-    * Удалить Bridge-заметку
-    */
    async deleteBridgeNoteForTask(task) {
       await Note.destroy({
          where: { bridge_type: 'task', bridge_id: task.id }
@@ -655,9 +662,6 @@ class TaskService {
 
    // ========== ФОРМАТТЕРЫ ==========
 
-   /**
-    * Форматировать метрики для отображения
-    */
    formatTaskMetrics(metrics) {
       switch (metrics.type) {
          case 'sets_reps':
@@ -674,9 +678,6 @@ class TaskService {
       }
    }
 
-   /**
-    * Форматировать описание задания
-    */
    formatTaskDescription(task, exerciseDescription) {
       let desc = exerciseDescription || '';
       if (task.custom_description) {

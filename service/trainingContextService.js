@@ -52,9 +52,9 @@ class TrainingContextService {
       }
 
       // 6. Проверяем существование активного контекста для этого спорта
-      const exists = await TrainingContextRepository.exists(friendship.id, sport);
-      if (exists) {
-         throw ApiError.badRequest(`Контекст тренировки для спорта "${sport}" уже существует`);
+      const existing = await TrainingContextRepository.findActiveByFriendAndSport(friendship.id, sport);
+      if (existing) {
+         return existing;
       }
 
       // 7. Создаём контекст
@@ -69,7 +69,8 @@ class TrainingContextService {
 
       console.log(`✅ TrainingContextService.createContext: контекст создан, ID: ${context.id}`);
 
-      return await TrainingContextRepository.findById(context.id);
+      // Возвращаем созданный контекст без дополнительного findById
+      return context;
    }
 
    /**

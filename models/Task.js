@@ -38,6 +38,16 @@ module.exports = (sequelize) => {
          onDelete: 'CASCADE',
          comment: 'Кто назначил (тренер)'
       },
+      context_id: {
+         type: DataTypes.INTEGER,
+         allowNull: true,
+         references: {
+            model: 'training_contexts',
+            key: 'id'
+         },
+         onDelete: 'SET NULL',
+         comment: 'Ссылка на тренировочный контекст (тренер, вид спорта)'
+      },
       custom_title: {
          type: DataTypes.STRING(255),
          allowNull: true,

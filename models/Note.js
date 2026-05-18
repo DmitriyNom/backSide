@@ -133,7 +133,21 @@ module.exports = (sequelize) => {
          type: DataTypes.JSONB,
          defaultValue: {},
          allowNull: true
+      },
+
+      bridge_type: {
+         type: DataTypes.STRING(50),
+         allowNull: true
+      },
+      bridge_id: {
+         type: DataTypes.INTEGER,
+         allowNull: true
+      },
+      bridge_metadata: {
+         type: DataTypes.JSONB,
+         allowNull: true
       }
+
    }, {
       tableName: 'notes',
       underscored: false,

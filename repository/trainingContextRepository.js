@@ -222,6 +222,50 @@ class TrainingContextRepository {
          return [];
       }
    }
+
+   /**
+ * Получить активные контексты тренировок между двумя пользователями
+ * @param {number} userId1 - ID первого пользователя
+ * @param {number} userId2 - ID второго пользователя
+ * @param {Object} options - { status }
+ */
+   async getContextsBetweenUsers(userId1, userId2, options = {}) {
+      try {
+         const where = {};
+         if (options.status) {
+            where.status = options.status;
+         }
+
+         const contexts = await TrainingContext.findAll({
+            where: {
+               [Op.or]: [
+                  { trainer_id: userId1, trainee_id: userId2 },
+                  { trainer_id: userId2, trainee_id: userId1 }
+               ],
+               ...where
+            },
+            include: [
+               { model: User, as: 'trainer', attributes: ['id', 'userName', 'userAvatar'] },
+               { model: User, as: 'trainee', attributes: ['id', 'userName', 'userAvatar'] }
+            ]
+         });
+
+         return contexts;
+      } catch (error) {
+         console.error('Error in TrainingContextRepository.getContextsBetweenUsers:', error);
+         return [];
+      }
+   }
+
+   async findActiveByFriendAndSport(friendId, sport) {
+      return await TrainingContext.findOne({
+         where: {
+            friend_id: friendId,
+            sport: sport,
+            status: 'active'
+         }
+      });
+   }
 }
 
 module.exports = new TrainingContextRepository();

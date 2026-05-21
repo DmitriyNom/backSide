@@ -1,11 +1,10 @@
 // service/taskService.js
-const { Task, Exercise, User, Media, ExerciseMedia, sequelize, friend: Friend, training_context: TrainingContext, note: Note } = require('../models');
+const { Task, Exercise, User, Media, ExerciseMedia, sequelize, friend: Friend, training_context: TrainingContext } = require('../models');
 const ApiError = require('../error/ApiError');
 const { Op } = require('sequelize');
 const TrainingContextService = require('./trainingContextService');
 
 const TaskRepository = require('../repository/taskRepository');
-
 
 console.log('✅ TaskRepository loaded:', typeof TaskRepository?.create);
 
@@ -16,7 +15,6 @@ class TaskService {
     * Создать задание
     */
    async createTask(data, userId) {
-
       console.log('🔍 1. TaskRepository.create exists:', typeof TaskRepository?.create);
 
       const transaction = await sequelize.transaction();
@@ -100,7 +98,6 @@ class TaskService {
          // 5. Создаём задание
          const task = await TaskRepository.create(taskData, transaction);
 
-
          console.log('🔍 3. Task created:', task?.id);
 
          // 6. Если есть медиа и задание кастомное — привязываем
@@ -110,10 +107,7 @@ class TaskService {
             }
          }
 
-         // 7. Создаём Bridge-заметку для спортсмена
-         await this.createBridgeNoteForTask(task, transaction);
-
-         // 8. Если задание из библиотеки — увеличиваем usage_count
+         // 7. Если задание из библиотеки — увеличиваем usage_count
          if (data.exercise_id) {
             await Exercise.increment('usage_count', {
                by: 1,
@@ -192,10 +186,33 @@ class TaskService {
    /**
     * Получить задания пользователя
     */
-   async getUserTasks(userId, role = 'assignee', status = null) {
-      return await TaskRepository.findAllForUser(userId, { role, status });
-   }
+   // service/taskService.js - ТОЛЬКО ИЗМЕНЕННАЯ ЧАСТЬ
+   // Остальные методы остаются без изменений
 
+   /**
+  * Получить задания пользователя
+  * @param {number} userId - ID пользователя
+  * @param {string} role - 'assignee' (я выполняю) или 'assigner' (я создал)
+  * @param {string} status - 'active', 'completed', 'archived' или null
+  * @param {string} sortBy - 'created_at', 'due_date', 'title', 'priority'
+  * @param {string} sortOrder - 'asc' или 'desc'
+  */
+   // В taskService.js, в методе getUserTasks:
+   async getUserTasks(userId, role = 'assignee', status = null, sortBy = 'created_at', sortOrder = 'desc') {
+      // Валидация sortBy
+      const validSortFields = ['created_at', 'due_date', 'title', 'priority'];
+      if (!validSortFields.includes(sortBy)) {
+         sortBy = 'created_at';
+      }
+
+      // Валидация sortOrder
+      const validSortOrders = ['asc', 'desc'];
+      if (!validSortOrders.includes(sortOrder.toLowerCase())) {
+         sortOrder = 'desc';
+      }
+
+      return await TaskRepository.findAllForUser(userId, { role, status, sortBy, sortOrder });
+   }
    /**
     * Получить задание по ID с проверкой прав
     */
@@ -263,7 +280,6 @@ class TaskService {
          }
 
          const updatedTask = await TaskRepository.findById(id, transaction);
-         await this.updateBridgeNoteForTask(updatedTask, transaction);
 
          await transaction.commit();
 
@@ -296,7 +312,6 @@ class TaskService {
       }
 
       const updatedTask = await TaskRepository.update(id, updateData);
-      await this.updateBridgeNoteForTask(updatedTask);
 
       return updatedTask;
    }
@@ -317,7 +332,6 @@ class TaskService {
          throw ApiError.forbidden('Только создатель задания может его удалить');
       }
 
-      await this.deleteBridgeNoteForTask(task);
       return await TaskRepository.delete(id);
    }
 
@@ -332,7 +346,17 @@ class TaskService {
     * Получить статистику по заданиям
     */
    async getTaskStats(userId) {
-      return await TaskRepository.getUserTaskStats(userId);
+      const stats = await TaskRepository.getUserTaskStats(userId);
+
+      // Добавляем подсчет созданных заданий
+      const created = await Task.count({
+         where: { assigned_by_user_id: userId }
+      });
+
+      return {
+         ...stats,
+         created
+      };
    }
 
    /**
@@ -486,7 +510,6 @@ class TaskService {
     * Для других проверка дружбы выполняется в createTask
     */
    async canAssignTask(assignerId, targetUserId) {
-      // Только себе можно создавать задания без дополнительных проверок
       return assignerId === targetUserId;
    }
 
@@ -589,103 +612,6 @@ class TaskService {
       }
 
       return Math.min(points, basePoints * 1.5);
-   }
-
-   // ========== РАБОТА С BRIDGE-ЗАМЕТКАМИ ==========
-
-   async createBridgeNoteForTask(task, transaction = null) {
-      const exercise = task.exercise_id
-         ? await Exercise.findByPk(task.exercise_id, { transaction })
-         : null;
-
-      const title = exercise?.title || task.custom_title;
-      const description = exercise?.description || task.custom_description;
-
-      await Note.create({
-         user_id: task.user_id,
-         note_name: `📋 Задание: ${title}`,
-         note_description: this.formatTaskDescription(task, description),
-         bridge_type: 'task',
-         bridge_id: task.id,
-         bridge_metadata: {
-            preview: {
-               title: title,
-               subtitle: this.formatTaskMetrics(task.metrics),
-               status: task.status,
-               due_date: task.due_date,
-               priority: task.priority,
-               assigner_id: task.assigned_by_user_id
-            },
-            actions: {
-               primary: {
-                  label: 'Выполнить',
-                  action: 'complete_task',
-                  url: `/tasks/${task.id}/execute`
-               },
-               secondary: {
-                  label: 'Подробнее',
-                  action: 'view_task',
-                  url: `/tasks/${task.id}`
-               }
-            }
-         }
-      }, { transaction });
-   }
-
-   async updateBridgeNoteForTask(task, transaction = null) {
-      const note = await Note.findOne({
-         where: { bridge_type: 'task', bridge_id: task.id },
-         transaction
-      });
-
-      if (note) {
-         const metadata = note.bridge_metadata || {};
-         if (metadata.preview) {
-            metadata.preview.status = task.status;
-            if (task.completed_at) {
-               metadata.preview.completed_at = task.completed_at;
-            }
-         }
-
-         await note.update({
-            status: task.status === 'completed' ? 'completed' : 'active',
-            bridge_metadata: metadata
-         }, { transaction });
-      }
-   }
-
-   async deleteBridgeNoteForTask(task) {
-      await Note.destroy({
-         where: { bridge_type: 'task', bridge_id: task.id }
-      });
-   }
-
-   // ========== ФОРМАТТЕРЫ ==========
-
-   formatTaskMetrics(metrics) {
-      switch (metrics.type) {
-         case 'sets_reps':
-            return `${metrics.sets}×${metrics.reps} повторов`;
-         case 'duration':
-            const minutes = Math.floor((metrics.duration_seconds || 0) / 60);
-            return `${minutes} минут`;
-         case 'weight':
-            return `${metrics.weight_kg} кг, ${metrics.sets}×${metrics.reps}`;
-         case 'interval':
-            return `${metrics.intervals} интервалов по ${metrics.work_seconds}с`;
-         default:
-            return 'Выполнить';
-      }
-   }
-
-   formatTaskDescription(task, exerciseDescription) {
-      let desc = exerciseDescription || '';
-      if (task.custom_description) {
-         desc = task.custom_description;
-      }
-
-      const metricsDesc = this.formatTaskMetrics(task.metrics);
-      return `${desc}\n\n🎯 Задача: ${metricsDesc}`.trim();
    }
 }
 

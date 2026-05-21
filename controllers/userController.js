@@ -185,6 +185,8 @@ class UserController {
                secure: process.env.NODE_ENV === 'production',
                sameSite: 'Strict',
                maxAge: 60 * 60 * 1000,
+               // maxAge: 30 * 1000,
+
             });
 
             res.cookie('refreshToken', refreshToken, {
@@ -494,7 +496,9 @@ class UserController {
                   httpOnly: true,
                   secure: process.env.NODE_ENV === 'production',
                   sameSite: 'Strict',
-                  maxAge: 60 * 60 * 1000,
+                  // maxAge: 60 * 60 * 1000,
+                  maxAge: 30 * 1000,
+
                });
 
                res.cookie('refreshToken', refreshToken, {

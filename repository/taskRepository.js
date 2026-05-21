@@ -49,8 +49,102 @@ class TaskRepository {
       });
    }
 
+   // ========== ПРИВАТНЫЕ МЕТОДЫ ДЛЯ ПОСТРОЕНИЯ ЗАПРОСОВ ==========
+
    /**
-    * Получить задания для пользователя
+    * Построение WHERE условия для фильтрации
+    * @private
+    */
+   _buildWhereCondition(userId, role, status) {
+      const where = {};
+      if (role === 'assignee') {
+         where.user_id = userId;
+      } else {
+         where.assigned_by_user_id = userId;
+      }
+      if (status) {
+         where.status = status;
+      }
+      return where;
+   }
+
+   /**
+    * Построение ORDER BY для сортировки по дате создания
+    * @private
+    */
+   _buildOrderByCreatedAt(sortOrder) {
+      const direction = sortOrder.toUpperCase();
+      return [['created_at', direction]];
+   }
+
+   /**
+    * Построение ORDER BY для сортировки по дедлайну
+    * @private
+    */
+   _buildOrderByDueDate(sortOrder) {
+      const direction = sortOrder.toUpperCase();
+      const nullsPlacement = sortOrder === 'desc' ? 'NULLS LAST' : 'NULLS FIRST';
+      return [
+         [sequelize.literal(`due_date ${direction} ${nullsPlacement}`)],
+         ['created_at', 'DESC']
+      ];
+   }
+
+   /**
+    * Построение ORDER BY для сортировки по приоритету
+    * @private
+    */
+   _buildOrderByPriority(sortOrder) {
+      const direction = sortOrder === 'desc' ? 'DESC' : 'ASC';
+      return [
+         ['priority', direction],
+         [sequelize.literal(`due_date DESC NULLS LAST`)]
+      ];
+   }
+
+   /**
+    * Построение ORDER BY для сортировки по названию
+    * @private
+    */
+   _buildOrderByTitle(sortOrder) {
+      const direction = sortOrder.toUpperCase();
+      return [
+         [sequelize.literal(`COALESCE("exercise"."title", "Task"."custom_title") ${direction}`)],
+         [sequelize.literal(`due_date DESC NULLS LAST`)]
+      ];
+   }
+
+   /**
+    * Построение ORDER BY в зависимости от поля сортировки
+    * @private
+    */
+   _buildOrderBy(sortBy, sortOrder) {
+      switch (sortBy) {
+         case 'created_at':
+            return this._buildOrderByCreatedAt(sortOrder);
+         case 'due_date':
+            return this._buildOrderByDueDate(sortOrder);
+         case 'priority':
+            return this._buildOrderByPriority(sortOrder);
+         case 'title':
+            return this._buildOrderByTitle(sortOrder);
+         default:
+            return [['created_at', 'DESC']];
+      }
+   }
+
+   // ========== ОСНОВНЫЕ МЕТОДЫ ==========
+
+   /**
+    * Получить задания для пользователя с сортировкой
+    * @param {number} userId - ID пользователя
+    * @param {Object} options - Опции
+    * @param {number} options.limit - Лимит
+    * @param {number} options.offset - Смещение
+    * @param {string} options.status - Статус фильтрации
+    * @param {string} options.role - 'assignee' (я выполняю) или 'assigner' (я создал)
+    * @param {string} options.sortBy - Поле сортировки ('created_at', 'due_date', 'title', 'priority')
+    * @param {string} options.sortOrder - Направление ('asc' или 'desc')
     */
    async findAllForUser(userId, options = {}) {
       const {
@@ -58,19 +152,14 @@ class TaskRepository {
          offset = 0,
          status = null,
          role = 'assignee',
-         order = [['due_date', 'ASC'], ['priority', 'DESC']]
+         sortBy = 'created_at',
+         sortOrder = 'desc'
       } = options;
 
-      const where = {};
-      if (role === 'assignee') {
-         where.user_id = userId;
-      } else {
-         where.assigned_by_user_id = userId;
-      }
+      const where = this._buildWhereCondition(userId, role, status);
+      const order = this._buildOrderBy(sortBy, sortOrder);
 
-      if (status) {
-         where.status = status;
-      }
+      console.log('🔍 TaskRepository.findAllForUser:', { userId, role, status, sortBy, sortOrder });
 
       return await Task.findAndCountAll({
          where,
@@ -294,7 +383,7 @@ class TaskRepository {
       });
    }
 
-   // ========== НОВЫЕ МЕТОДЫ ДЛЯ ПРОВЕРКИ ПРАВ ==========
+   // ========== МЕТОДЫ ДЛЯ ПРОВЕРКИ ПРАВ ==========
 
    /**
     * Получить список спортсменов, которых тренирует пользователь

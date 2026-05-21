@@ -10,7 +10,7 @@ module.exports = (sequelize) => {
       },
       user_id: {
          type: DataTypes.INTEGER,
-         allowNull: true, // В БД "YES"
+         allowNull: true,
          references: {
             model: 'users',
             key: 'id'
@@ -53,7 +53,7 @@ module.exports = (sequelize) => {
          allowNull: true
       },
       note_type: {
-         type: DataTypes.STRING, // В БД character varying, не ENUM
+         type: DataTypes.STRING,
          defaultValue: 'personal_note',
          allowNull: true
       },
@@ -97,7 +97,7 @@ module.exports = (sequelize) => {
          }
       },
       status: {
-         type: DataTypes.STRING, // В БД character varying
+         type: DataTypes.STRING,
          defaultValue: 'active',
          allowNull: true
       },
@@ -133,27 +133,13 @@ module.exports = (sequelize) => {
          type: DataTypes.JSONB,
          defaultValue: {},
          allowNull: true
-      },
-
-      bridge_type: {
-         type: DataTypes.STRING(50),
-         allowNull: true
-      },
-      bridge_id: {
-         type: DataTypes.INTEGER,
-         allowNull: true
-      },
-      bridge_metadata: {
-         type: DataTypes.JSONB,
-         allowNull: true
       }
-
    }, {
       tableName: 'notes',
       underscored: false,
       timestamps: true,
-      createdAt: 'createdAt', // Точно как в БД
-      updatedAt: 'updatedAt'  // Точно как в БД
+      createdAt: 'createdAt',
+      updatedAt: 'updatedAt'
    });
 
    return Note;

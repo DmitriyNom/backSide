@@ -1,148 +1,3 @@
-
-// const ApiError = require('../error/ApiError');
-// const NoteRepository = require('../repository/noteRepository');
-// const UserRepository = require('../repository/userRepository');
-// const UserConnectionRepository = require('../repository/userConnectionRepository');
-// const { Sequelize } = require('sequelize');
-
-// class NoteService {
-//    // async createNote(note) {
-//    //    // note уже содержит userId
-//    //    return await NoteRepository.create(note);
-//    // }
-
-//    async createNote(noteData) {
-//       const { note_type, assigned_to_user_id, user_id } = noteData;
-
-//       // Валидация тренерских заданий
-//       if (note_type === 'trainer_assignment') {
-//          // Проверяем, что пользователь - тренер
-//          const user = await UserRepository.findUserById(user_id);
-//          if (!user || user.role !== 'trainer') {
-//             throw ApiError.forbidden('Только тренеры могут создавать задания для других');
-//          }
-
-//          // Проверяем, что подопечный существует и связан с тренером
-//          const connectionExists = await UserConnectionRepository.checkConnection(
-//             user_id,
-//             assigned_to_user_id
-//          );
-
-//          if (!connectionExists) {
-//             throw ApiError.forbidden('Вы можете назначать задания только своим подопечным');
-//          }
-//       }
-
-//       // Для self_assignment назначаем самому себе
-//       if (note_type === 'self_assignment') {
-//          noteData.assigned_to_user_id = user_id;
-//       }
-
-//       // Устанавливаем статус по умолчанию
-//       if (!noteData.status) {
-//          noteData.status = note_type === 'personal_note' ? 'active' : 'draft';
-//       }
-
-//       return await NoteRepository.create(noteData);
-//    }
-//    // async getAllNotes(userId, limit, offset) {
-//    //    // фильтрация по userId
-//    //    return await NoteRepository.findAll(userId, limit, offset);
-//    // }
-
-//    async getAllNotes(userId, limit, offset, filters = {}) {
-//       // filters может содержать: note_type, status, planned_date, и т.д.
-//       return await NoteRepository.findAll(userId, limit, offset, filters);
-//    }
-
-//    async getOneNote(id, userId) {
-//       return await NoteRepository.findOne(id, userId);
-//    }
-
-//    async updateOneNote(note, id, userId) {
-//       // сначала проверим, что заметка принадлежит пользователю
-//       const existingNote = await this.getOneNote(id, userId);
-//       if (!existingNote) {
-//          throw ApiError.badRequest('Запись не найдена или нет доступа');
-//       }
-
-//       const [updatedRowsCount, updatedRows] = await NoteRepository.update(note, id, userId);
-//       if (updatedRowsCount === 0) {
-//          throw ApiError.badRequest('Запись не найдена для обновления');
-//       }
-//       return updatedRows[0]; // возвращаем обновлённый объект
-//    }
-
-//    async deleteOneNote(id, userId) {
-//       const note = await this.getOneNote(id, userId);
-//       if (!note) {
-//          throw ApiError.badRequest('Запись не найдена или нет доступа');
-//       }
-//       const deletedCount = await NoteRepository.destroyById(id, userId);
-//       if (deletedCount === 0) {
-//          throw ApiError.badRequest('Не удалось удалить запись');
-//       }
-//       console.log('Record deleted successfully');
-//       return true;  // Возвращаем true, если удалено успешно
-//    }
-
-//    async getUserAssignments(userId, limit, offset, filters = {}) {
-//       const {
-//          status,
-//          note_type,
-//          date_from,
-//          date_to,
-//          overdue = false
-//       } = filters;
-
-//       // Задания, где пользователь является исполнителем
-//       const conditions = {
-//          [Sequelize.Op.or]: [
-//             { assigned_to_user_id: userId }, // задания от тренера
-//             { user_id: userId, note_type: 'self_assignment' } // личные задания
-//          ]
-//       };
-
-//       // Дополнительные фильтры
-//       if (status) {
-//          conditions.status = status;
-//       }
-
-//       if (note_type) {
-//          conditions.note_type = note_type;
-//       } else {
-//          // По умолчанию только задания
-//          conditions.note_type = ['self_assignment', 'trainer_assignment'];
-//       }
-
-//       // Фильтр по датам
-//       const dateFilter = {};
-//       if (date_from) {
-//          dateFilter[Sequelize.Op.gte] = date_from;
-//       }
-//       if (date_to) {
-//          dateFilter[Sequelize.Op.lte] = date_to;
-//       }
-
-//       if (date_from || date_to) {
-//          conditions.planned_date = dateFilter;
-//       }
-
-//       // Просроченные задания
-//       if (overdue) {
-//          conditions.status = 'active';
-//          conditions.planned_date = {
-//             [Sequelize.Op.lt]: new Date()
-//          };
-//       }
-
-//       return await NoteRepository.findWithConditions(conditions, limit, offset);
-//    }
-// }
-
-// module.exports = new NoteService();
-
-
 const ApiError = require('../error/ApiError');
 const NoteRepository = require('../repository/noteRepository');
 const UserRepository = require('../repository/userRepository');
@@ -150,6 +5,40 @@ const UserConnectionRepository = require('../repository/userConnectionRepository
 const { Sequelize } = require('sequelize');
 
 class NoteService {
+   /**
+    * Вычисление статуса заметки на основе её полей
+    * @param {Object} noteData - данные заметки
+    * @param {Object|null} existingNote - существующая заметка (для обновления)
+    * @returns {string|null} - вычисленный статус
+    * @private
+    */
+   _computeStatus(noteData, existingNote = null) {
+      // Для личных заметок вычисляем статус на основе дедлайна и выполнения
+      const isCompleted = noteData.note_is_completed ?? existingNote?.note_is_completed ?? false;
+      const expirationDate = noteData.note_expiration_date ?? existingNote?.note_expiration_date ?? null;
+
+      // Если выполнено
+      if (isCompleted === true) {
+         return 'completed';
+      }
+
+      // Если есть дедлайн
+      if (expirationDate) {
+         const now = new Date();
+         const expDate = new Date(expirationDate);
+
+         // Если дедлайн просрочен
+         if (expDate < now) {
+            return 'overdue';
+         }
+         // Если дедлайн в будущем
+         return 'in_progress';
+      }
+
+      // Если нет дедлайна и не выполнено
+      return 'active';
+   }
+
    async createNote(noteData) {
       const { note_type, assigned_to_user_id, user_id } = noteData;
 
@@ -177,17 +66,30 @@ class NoteService {
          noteData.assigned_to_user_id = user_id;
       }
 
-      // Устанавливаем статус по умолчанию
-      if (!noteData.status) {
-         noteData.status = note_type === 'personal_note' ? 'active' : 'draft';
+      // 🔧 ВЫЧИСЛЯЕМ СТАТУС для личных заметок
+      if (note_type === 'personal_note') {
+         noteData.status = this._computeStatus(noteData);
+      } else if (!noteData.status) {
+         noteData.status = 'draft';
       }
 
       return await NoteRepository.create(noteData);
    }
 
-   async getAllNotes(userId, limit, offset, filters = {}) {
-      // filters может содержать: note_type, status, planned_date, и т.д.
-      return await NoteRepository.findAll(userId, limit, offset, filters);
+   async getAllNotes(userId, limit, offset, filters = {}, sortBy = 'createdAt', sortOrder = 'desc') {
+
+      console.log('📝 NoteService.getAllNotes:', { sortBy, sortOrder });
+      // 🔧 ИСПРАВЛЕНО: заменён planned_date на note_expiration_date
+      const validSortFields = ['createdAt', 'note_name', 'note_priority', 'note_expiration_date', 'status'];
+      if (!validSortFields.includes(sortBy)) {
+         sortBy = 'createdAt';
+      }
+      // Валидация sortOrder
+      const validSortOrders = ['asc', 'desc'];
+      if (!validSortOrders.includes(sortOrder.toLowerCase())) {
+         sortOrder = 'desc';
+      }
+      return await NoteRepository.findAll(userId, limit, offset, filters, sortBy, sortOrder);
    }
 
    async getOneNote(id, userId) {
@@ -199,6 +101,13 @@ class NoteService {
       const existingNote = await this.getOneNote(id, userId);
       if (!existingNote) {
          throw ApiError.badRequest('Запись не найдена или нет доступа');
+      }
+
+      // 🔧 ВЫЧИСЛЯЕМ СТАТУС при обновлении (для личных заметок)
+      if (existingNote.note_type === 'personal_note') {
+         // Объединяем существующие данные с новыми
+         const mergedData = { ...existingNote.toJSON(), ...note };
+         note.status = this._computeStatus(mergedData, existingNote);
       }
 
       const [updatedRowsCount, updatedRows] = await NoteRepository.update(note, id, userId);

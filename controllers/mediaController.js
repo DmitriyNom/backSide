@@ -58,19 +58,35 @@ class MediaController {
       }
    }
 
+
    async getMyMedia(req, res, next) {
       try {
          const userId = req.user.id;
-         const { fileType, limit = 50, offset = 0 } = req.query;
+         const {
+            fileType,
+            sortBy = 'created_at',
+            sortOrder = 'desc',
+            limit = 50,
+            offset = 0
+         } = req.query;
 
-         // Используем единый MediaService
+         // Используем MediaService с новыми параметрами
          const result = await MediaService.getUserMedia(userId, {
             fileType,
+            sortBy,
+            sortOrder,
             limit: parseInt(limit),
             offset: parseInt(offset)
          });
 
-         return res.json(result);
+         // Возвращаем в том же формате, что и задачи (единообразие API)
+         return res.json({
+            success: true,
+            data: result.rows,
+            total: result.count,
+            limit: parseInt(limit),
+            offset: parseInt(offset)
+         });
       } catch (error) {
          console.error('❌ Error in getMyMedia:', error);
          next(ApiError.internal(error.message));

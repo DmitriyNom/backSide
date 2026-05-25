@@ -340,8 +340,12 @@ class NoteController {
             note_type,
             status,
             planned_date,
-            show_assignments_only
+            show_assignments_only,
+            sortBy = 'createdAt',      // ← новое
+            sortOrder = 'desc'         // ← новое
          } = req.query;
+
+         console.log('📝 getAllNotes received:', { sortBy, sortOrder, page, limit });
 
          page = parseInt(page) || 1;
          limit = parseInt(limit) || 10;
@@ -368,7 +372,7 @@ class NoteController {
          }
 
          const { count: totalCount, rows: notes } =
-            await NoteService.getAllNotes(userId, limit, offset, filters);
+            await NoteService.getAllNotes(userId, limit, offset, filters, sortBy, sortOrder);
 
          return res.json({
             notes,

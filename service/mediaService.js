@@ -243,31 +243,49 @@ class MediaService {
       return { success: true, mediaId };
    }
 
+
    async getUserMedia(userId, filters = {}) {
-      const media = await this.mediaRepo.findByUser(userId, filters);
+      const {
+         fileType,
+         sortBy = 'created_at',
+         sortOrder = 'desc',
+         limit = 50,
+         offset = 0
+      } = filters;
 
+      // ВАЛИДАЦИЯ sortBy (как в taskService)
+      const validSortFields = ['created_at', 'original_filename', 'file_type', 'size'];
+      if (!validSortFields.includes(sortBy)) {
+         sortBy = 'created_at';
+      }
+
+      // ВАЛИДАЦИЯ sortOrder
+      const validSortOrders = ['asc', 'desc'];
+      if (!validSortOrders.includes(sortOrder.toLowerCase())) {
+         sortOrder = 'desc';
+      }
+
+      // Получаем из репозитория с пагинацией и сортировкой
+      const result = await this.mediaRepo.findByUser(userId, {
+         fileType,
+         sortBy,
+         sortOrder,
+         limit,
+         offset
+      });
+
+      // Обогащаем каждый медиа-файл URL (как было раньше)
       const mediaWithUrls = await Promise.all(
-         media.map(async (item) => {
-            // Парсим storage_url
-            const [bucketType, accessType, ...objectParts] = item.storage_url.split('/');
-            const objectName = objectParts.join('/');
-            const isPublic = bucketType === 'media' && accessType === 'public';
-
-            const downloadUrl = await this.generateDownloadUrl(objectName, isPublic);
-            const publicUrl = this.getPublicUrl(objectName, isPublic);
-
-            return {
-               ...item.toJSON(),
-               downloadUrl,
-               publicUrl,
-               isPublic,
-               bucket: `${bucketType}/${accessType}`,
-               category: item.metadata?.category || this.getFileCategory(item.original_filename)
-            };
+         result.rows.map(async (item) => {
+            return await this.enrichMediaWithUrls(item);
          })
       );
 
-      return mediaWithUrls;
+      // Возвращаем в формате, совместимом с контроллером
+      return {
+         rows: mediaWithUrls,
+         count: result.count
+      };
    }
 
    async fileExists(objectName, isPublic = false) {
